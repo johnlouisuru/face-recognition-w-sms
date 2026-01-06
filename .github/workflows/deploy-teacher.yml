@@ -41,7 +41,7 @@ jobs:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: /admin/           # Deploy only admin folder
+          local-dir: ./admin/           # Deploy only admin folder
           server-dir: /kenneth/admin/  # Change this to your target directory 
           exclude: |
             **/.git*
