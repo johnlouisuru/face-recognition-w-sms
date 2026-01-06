@@ -1,0 +1,867 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .nav {
+            background: #f8f9fa;
+            padding: 15px 30px;
+            border-bottom: 2px solid #dee2e6;
+        }
+        .nav a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+        .nav a:hover {
+            text-decoration: underline;
+        }
+        .content {
+            padding: 30px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .stat-card h3 {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        .stat-card .number {
+            font-size: 2.5em;
+            font-weight: bold;
+        }
+        .filters {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .filter-row {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: end;
+        }
+        .filter-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        .filter-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+        .filter-group input,
+        .filter-group select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #dee2e6;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+        .btn {
+            padding: 10px 30px;
+            font-size: 1em;
+            font-weight: 600;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #218838;
+        }
+        .section {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        .attendance-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        .attendance-table th,
+        .attendance-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .attendance-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+        .attendance-table tr:hover {
+            background: #f8f9fa;
+        }
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        .status-present {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-absent {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status-incomplete {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status-complete {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        .empty-state-icon {
+            font-size: 4em;
+            margin-bottom: 15px;
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #dee2e6;
+        }
+        .tab {
+            padding: 15px 25px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+        }
+        .tab:hover {
+            color: #667eea;
+        }
+        .tab.active {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .duration {
+            font-weight: 600;
+            color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Attendance Dashboard</h1>
+            <p>Monitor attendance, view reports, and analyze trends</p>
+        </div>
+
+        <div class="nav">
+            <a href="index.html">← Back to Dashboard</a>
+        </div>
+
+        <div class="content">
+            <!-- Statistics Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Total Students</h3>
+                    <div class="number" id="totalStudents">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Present Today</h3>
+                    <div class="number" id="presentToday">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Absent Today</h3>
+                    <div class="number" id="absentToday">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Attendance Rate</h3>
+                    <div class="number" id="attendanceRate">0%</div>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="filters">
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label>Start Date:</label>
+                        <input type="date" id="startDate">
+                    </div>
+                    <div class="filter-group">
+                        <label>End Date:</label>
+                        <input type="date" id="endDate">
+                    </div>
+                    <!-- Add this in the filters section, after End Date and before Student filter -->
+                    <div class="filter-group">
+                        <label>Section:</label>
+                        <select id="sectionFilter" onchange="onSectionFilterChange()">
+                            <option value="">All Sections</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Student:</label>
+                        <select id="studentFilter">
+                            <option value="">All Students</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Status:</label>
+                        <select id="statusFilter">
+                            <option value="">All Status</option>
+                            <option value="complete">Complete (In & Out)</option>
+                            <option value="incomplete">Incomplete</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: end;">
+                        <button class="btn btn-primary" onclick="applyFilters()">🔍 Filter</button>
+                        <button class="btn btn-success" onclick="exportReport()">📥 Export</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('today')">Today's Attendance</button>
+                <button class="tab" onclick="switchTab('history')">Attendance History</button>
+                <button class="tab" onclick="switchTab('student-report')">Student Report</button>
+                <button class="tab" onclick="switchTab('summary')">Summary Report</button>
+            </div>
+
+            <!-- Today's Attendance Tab -->
+            <div id="today" class="tab-content active">
+                <div class="section">
+                    <h2>Today's Attendance Records</h2>
+                    <div id="todayContent"></div>
+                </div>
+            </div>
+
+            <!-- History Tab -->
+            <div id="history" class="tab-content">
+                <div class="section">
+                    <h2>Attendance History</h2>
+                    <div id="historyContent"></div>
+                </div>
+            </div>
+
+            <!-- Student Report Tab -->
+            <div id="student-report" class="tab-content">
+                <div class="section">
+                    <h2>Individual Student Report</h2>
+                    <div id="studentReportContent"></div>
+                </div>
+            </div>
+
+            <!-- Summary Tab -->
+            <div id="summary" class="tab-content">
+                <div class="section">
+                    <h2>Summary Report</h2>
+                    <div id="summaryContent"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allAttendance = [];
+        let allStudents = [];
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            setDefaultDates();
+            loadData();
+        });
+
+        function setDefaultDates() {
+            const today = new Date();
+            const sevenDaysAgo = new Date(today);
+            sevenDaysAgo.setDate(today.getDate() - 7);
+            
+            document.getElementById('startDate').value = formatDate(sevenDaysAgo);
+            document.getElementById('endDate').value = formatDate(today);
+        }
+
+        function formatDate(date) {
+            return date.toISOString().split('T')[0];
+        }
+
+        async function loadData() {
+            try {
+                // Load students
+                const studentsResponse = await fetch('get_students.php');
+                allStudents = await studentsResponse.json();
+                
+                // Populate student filter
+                const studentFilter = document.getElementById('studentFilter');
+                studentFilter.innerHTML = '<option value="">All Students</option>';
+                allStudents.forEach(student => {
+                    studentFilter.innerHTML += `<option value="${student.student_id}">${student.student_name} (${student.student_id})</option>`;
+                });
+
+                // Load attendance
+                await loadAttendance();
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+            }
+        }
+
+        async function loadAttendance() {
+            try {
+                const response = await fetch('get_all_attendance.php');
+                allAttendance = await response.json();
+                
+                updateStatistics();
+                applyFilters();
+            } catch (error) {
+                console.error('Error loading attendance:', error);
+            }
+        }
+
+        function updateStatistics() {
+    const today = new Date().toISOString().split('T')[0];
+    const todayRecords = allAttendance.filter(record => {
+        const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+        return recordDate === today;
+    });
+
+    // Get unique students who marked attendance today
+    const presentStudentIds = [...new Set(todayRecords.map(r => r.student_id))];
+    const presentCount = presentStudentIds.length;
+    const totalCount = allStudents.length;
+    const absentCount = totalCount - presentCount;
+    const rate = totalCount > 0 ? ((presentCount / totalCount) * 100).toFixed(1) : 0;
+
+    document.getElementById('totalStudents').textContent = totalCount;
+    document.getElementById('presentToday').textContent = presentCount;
+    document.getElementById('absentToday').textContent = absentCount;
+    document.getElementById('attendanceRate').textContent = rate + '%';
+}
+
+        function applyFilters() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const studentId = document.getElementById('studentFilter').value;
+            const status = document.getElementById('statusFilter').value;
+
+            let filtered = allAttendance.filter(record => {
+                const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+                
+                // Date filter
+                if (startDate && recordDate < startDate) return false;
+                if (endDate && recordDate > endDate) return false;
+                
+                // Student filter
+                if (studentId && record.student_id !== studentId) return false;
+                
+                // Status filter
+                if (status === 'complete' && (!record.time_in || !record.time_out)) return false;
+                if (status === 'incomplete' && record.time_in && record.time_out) return false;
+                
+                return true;
+            });
+
+            displayTodayAttendance(filtered);
+            displayHistory(filtered);
+            displayStudentReport(filtered);
+            displaySummary(filtered);
+        }
+
+       function displayTodayAttendance(data) {
+    const today = new Date().toISOString().split('T')[0];
+    const todayData = data.filter(record => {
+        const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+        return recordDate === today;
+    });
+
+    // Get current filter selections
+    const sectionId = document.getElementById('sectionFilter').value;
+    const studentId = document.getElementById('studentFilter').value;
+
+    // Filter students based on current filters
+    let studentsToShow = allStudents;
+    if (sectionId) {
+        studentsToShow = studentsToShow.filter(s => s.section_id === sectionId);
+    }
+    if (studentId) {
+        studentsToShow = studentsToShow.filter(s => s.student_id === studentId);
+    }
+
+    let html = '';
+    if (studentsToShow.length === 0) {
+        html = `<div class="empty-state">
+            <div class="empty-state-icon">📭</div>
+            <p>No students found</p>
+        </div>`;
+    } else {
+        html = `<table class="attendance-table">
+            <thead>
+                <tr>
+                    <th>Student ID</th>
+                    <th>Name</th>
+                    <th>Grade</th>
+                    <th>Section</th>
+                    <th>Time In 📲</th>
+                    <th>Time Out 📲</th>
+                    <th>Duration</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>`;
+        
+        // Display all students (present and absent)
+        studentsToShow.forEach(student => {
+            // Find if student has attendance record for today
+            const record = todayData.find(r => r.student_id === student.student_id);
+            
+            if (record) {
+                // Student has attendance record
+                const timeIn = record.time_in ? new Date(record.time_in).toLocaleTimeString() : '-';
+                const timeOut = record.time_out ? new Date(record.time_out).toLocaleTimeString() : '-';
+                const duration = calculateDuration(record.time_in, record.time_out);
+                const status = getStatus(record);
+                
+                html += `<tr>
+                    <td>${student.student_id}</td>
+                    <td>${student.student_name}</td>
+                    <td>${student.grade}</td>
+                    <td>${student.section_name || 'N/A'}</td>
+                    <td>${timeIn}</td>
+                    <td>${timeOut}</td>
+                    <td class="duration">${duration}</td>
+                    <td><span class="status-badge ${status.class}">${status.text}</span></td>
+                </tr>`;
+            } else {
+                // Student is absent (no attendance record)
+                html += `<tr>
+                    <td>${student.student_id}</td>
+                    <td>${student.student_name}</td>
+                    <td>${student.grade}</td>
+                    <td>${student.section_name || 'N/A'}</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td><span class="status-badge status-absent">Absent</span></td>
+                </tr>`;
+            }
+        });
+        
+        html += `</tbody></table>`;
+    }
+    
+    document.getElementById('todayContent').innerHTML = html;
+}
+
+        let allSections = [];
+
+// Update loadData function - add section loading
+async function loadData() {
+    try {
+        // Load sections first
+        const sectionsResponse = await fetch('get_sections.php');
+        allSections = await sectionsResponse.json();
+        
+        // Populate section filter
+        const sectionFilter = document.getElementById('sectionFilter');
+        sectionFilter.innerHTML = '<option value="">All Sections</option>';
+        allSections.forEach(section => {
+            sectionFilter.innerHTML += `<option value="${section.section_id}">${section.section_name}</option>`;
+        });
+        
+        // Load students
+        const studentsResponse = await fetch('get_students.php');
+        allStudents = await studentsResponse.json();
+        
+        // Populate student filter with all students initially
+        populateStudentFilter(allStudents);
+
+        // Load attendance
+        await loadAttendance();
+        
+    } catch (error) {
+        console.error('Error loading data:', error);
+    }
+}
+
+// Add this new function
+function populateStudentFilter(students) {
+    const studentFilter = document.getElementById('studentFilter');
+    studentFilter.innerHTML = '<option value="">All Students</option>';
+    students.forEach(student => {
+        studentFilter.innerHTML += `<option value="${student.student_id}">${student.student_name} (${student.student_id})</option>`;
+    });
+}
+
+// Add this new function
+function onSectionFilterChange() {
+    const selectedSection = document.getElementById('sectionFilter').value;
+    
+    if (!selectedSection) {
+        // Show all students if no section selected
+        populateStudentFilter(allStudents);
+    } else {
+        // Filter students by selected section
+        const filteredStudents = allStudents.filter(student => 
+            student.section_id === selectedSection
+        );
+        populateStudentFilter(filteredStudents);
+    }
+    
+    // Reset student filter selection
+    document.getElementById('studentFilter').value = '';
+}
+
+// Update applyFilters function - add section filtering
+function applyFilters() {
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    const sectionId = document.getElementById('sectionFilter').value;
+    const studentId = document.getElementById('studentFilter').value;
+    const status = document.getElementById('statusFilter').value;
+
+    let filtered = allAttendance.filter(record => {
+        const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+        
+        // Date filter
+        if (startDate && recordDate < startDate) return false;
+        if (endDate && recordDate > endDate) return false;
+        
+        // Section filter
+        if (sectionId) {
+            const student = allStudents.find(s => s.student_id === record.student_id);
+            if (!student || student.section_id !== sectionId) return false;
+        }
+        
+        // Student filter
+        if (studentId && record.student_id !== studentId) return false;
+        
+        // Status filter
+        if (status === 'complete' && (!record.time_in || !record.time_out)) return false;
+        if (status === 'incomplete' && record.time_in && record.time_out) return false;
+        
+        return true;
+    });
+
+    displayTodayAttendance(filtered);
+    displayHistory(filtered);
+    displayStudentReport(filtered);
+    displaySummary(filtered);
+}
+
+        function displayHistory(data) {
+            let html = '';
+            if (data.length === 0) {
+                html = `<div class="empty-state">
+                    <div class="empty-state-icon">📭</div>
+                    <p>No attendance records found</p>
+                </div>`;
+            } else {
+                html = `<table class="attendance-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Student ID</th>
+                            <th>Name</th>
+                            <th>Grade</th>
+                            <th>Time In</th>
+                            <th>Time Out</th>
+                            <th>Duration</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+                
+                data.forEach(record => {
+                    const date = new Date(record.timestamp).toLocaleDateString();
+                    const timeIn = record.time_in ? new Date(record.time_in).toLocaleTimeString() : '-';
+                    const timeOut = record.time_out ? new Date(record.time_out).toLocaleTimeString() : '-';
+                    const duration = calculateDuration(record.time_in, record.time_out);
+                    const status = getStatus(record);
+                    
+                    html += `<tr>
+                        <td>${date}</td>
+                        <td>${record.student_id}</td>
+                        <td>${record.student_name}</td>
+                        <td>${record.student_grade}</td>
+                        <td>${timeIn}</td>
+                        <td>${timeOut}</td>
+                        <td class="duration">${duration}</td>
+                        <td><span class="status-badge ${status.class}">${status.text}</span></td>
+                    </tr>`;
+                });
+                
+                html += `</tbody></table>`;
+            }
+            
+            document.getElementById('historyContent').innerHTML = html;
+        }
+
+        function displayStudentReport(data) {
+            // Group by student
+            const byStudent = {};
+            data.forEach(record => {
+                if (!byStudent[record.student_id]) {
+                    byStudent[record.student_id] = {
+                        name: record.student_name,
+                        grade: record.student_grade,
+                        records: []
+                    };
+                }
+                byStudent[record.student_id].records.push(record);
+            });
+
+            let html = '';
+            if (Object.keys(byStudent).length === 0) {
+                html = `<div class="empty-state">
+                    <div class="empty-state-icon">📭</div>
+                    <p>No student records found</p>
+                </div>`;
+            } else {
+                html = `<table class="attendance-table">
+                    <thead>
+                        <tr>
+                            <th>Student ID</th>
+                            <th>Name</th>
+                            <th>Grade</th>
+                            <th>Total Days</th>
+                            <th>Complete Days</th>
+                            <th>Incomplete Days</th>
+                            <th>Completion Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+                
+                for (const [studentId, info] of Object.entries(byStudent)) {
+                    const total = info.records.length;
+                    const complete = info.records.filter(r => r.time_in && r.time_out).length;
+                    const incomplete = total - complete;
+                    const rate = total > 0 ? ((complete / total) * 100).toFixed(1) : 0;
+                    
+                    html += `<tr>
+                        <td>${studentId}</td>
+                        <td>${info.name}</td>
+                        <td>${info.grade}</td>
+                        <td>${total}</td>
+                        <td>${complete}</td>
+                        <td>${incomplete}</td>
+                        <td>${rate}%</td>
+                    </tr>`;
+                }
+                
+                html += `</tbody></table>`;
+            }
+            
+            document.getElementById('studentReportContent').innerHTML = html;
+        }
+
+        function displaySummary(data) {
+            // Group by date
+            const byDate = {};
+            data.forEach(record => {
+                const date = new Date(record.timestamp).toISOString().split('T')[0];
+                if (!byDate[date]) {
+                    byDate[date] = [];
+                }
+                byDate[date].push(record);
+            });
+
+            let html = '';
+            if (Object.keys(byDate).length === 0) {
+                html = `<div class="empty-state">
+                    <div class="empty-state-icon">📭</div>
+                    <p>No summary data available</p>
+                </div>`;
+            } else {
+                html = `<table class="attendance-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Total Students Present</th>
+                            <th>Complete Records</th>
+                            <th>Incomplete Records</th>
+                            <th>Completion Rate</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+                
+                // Sort dates descending
+                const sortedDates = Object.keys(byDate).sort().reverse();
+                
+                sortedDates.forEach(date => {
+                    const records = byDate[date];
+                    const uniqueStudents = [...new Set(records.map(r => r.student_id))].length;
+                    const complete = records.filter(r => r.time_in && r.time_out).length;
+                    const incomplete = records.length - complete;
+                    const rate = records.length > 0 ? ((complete / records.length) * 100).toFixed(1) : 0;
+                    
+                    const dateObj = new Date(date);
+                    const formattedDate = dateObj.toLocaleDateString('en-US', { 
+                        weekday: 'short', 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric' 
+                    });
+                    
+                    html += `<tr>
+                        <td><strong>${formattedDate}</strong></td>
+                        <td>${uniqueStudents}</td>
+                        <td>${complete}</td>
+                        <td>${incomplete}</td>
+                        <td>${rate}%</td>
+                    </tr>`;
+                });
+                
+                html += `</tbody></table>`;
+            }
+            
+            document.getElementById('summaryContent').innerHTML = html;
+        }
+
+        function calculateDuration(timeIn, timeOut) {
+            if (!timeIn || !timeOut) return '-';
+            
+            const start = new Date(timeIn);
+            const end = new Date(timeOut);
+            const diff = end - start;
+            
+            if (diff < 0) return '-';
+            
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            
+            return `${hours}h ${minutes}m`;
+        }
+
+        function getStatus(record) {
+            if (record.time_in && record.time_out) {
+                return { text: 'Complete', class: 'status-complete' };
+            } else if (record.time_in) {
+                return { text: 'Incomplete', class: 'status-incomplete' };
+            } else {
+                return { text: 'No Data', class: 'status-absent' };
+            }
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+        }
+
+        function exportReport() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const studentId = document.getElementById('studentFilter').value;
+
+            // Create CSV content
+            let csv = 'Date,Student ID,Name,Grade,Time In,Time Out,Duration,Status\n';
+            
+            const filtered = allAttendance.filter(record => {
+                const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+                if (startDate && recordDate < startDate) return false;
+                if (endDate && recordDate > endDate) return false;
+                if (studentId && record.student_id !== studentId) return false;
+                return true;
+            });
+
+            filtered.forEach(record => {
+                const date = new Date(record.timestamp).toLocaleDateString();
+                const timeIn = record.time_in ? new Date(record.time_in).toLocaleTimeString() : '-';
+                const timeOut = record.time_out ? new Date(record.time_out).toLocaleTimeString() : '-';
+                const duration = calculateDuration(record.time_in, record.time_out);
+                const status = getStatus(record).text;
+                
+                csv += `${date},"${record.student_id}","${record.student_name}","${record.student_grade}",${timeIn},${timeOut},${duration},${status}\n`;
+            });
+
+            // Download CSV
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `attendance_report_${startDate}_to_${endDate}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>

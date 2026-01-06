@@ -1,0 +1,373 @@
+<!-- ============================================ -->
+<!-- register.html - Student Registration -->
+<!-- ============================================ -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register Student</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .nav {
+            background: #f8f9fa;
+            padding: 15px 30px;
+            border-bottom: 2px solid #dee2e6;
+        }
+        .nav a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+        .nav a:hover {
+            text-decoration: underline;
+        }
+        .content {
+            padding: 40px;
+        }
+        .video-container {
+            position: relative;
+            max-width: 640px;
+            margin: 0 auto 30px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        #registerVideo {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border 0.3s;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        #studentGrade{
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border 0.3s;
+        }
+        #studentGrade:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .btn {
+            padding: 15px 40px;
+            font-size: 1.1em;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 10px 5px;
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+        .status {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 600;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>➕ Register New Student</h1>
+            <p>Capture face and student information</p>
+        </div>
+
+        <div class="nav">
+            <a href="index.html">← Back to Dashboard</a>
+        </div>
+
+        <div class="content">
+            <div class="loading" id="registerLoading">Loading face detection models...</div>
+            
+            <div id="registerForm" style="display:none;">
+                <div class="video-container">
+                    <video id="registerVideo" autoplay muted></video>
+                    <canvas id="registerCanvas"></canvas>
+                </div>
+
+                
+                <div style="text-align: center;">
+                    <button class="btn btn-success" onclick="captureAndRegister()">📷 Capture & Register Face</button>
+                </div>
+
+                <div class="form-group">
+                    <label for="studentId">Student ID:</label>
+                    <input type="text" id="studentId" placeholder="Enter student ID" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="studentName">Student First Name:</label>
+                    <input type="text" id="studentName" placeholder="Enter full name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="studentName">Student Last Name:</label>
+                    <input type="text" id="studentLast" placeholder="Enter full name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="studentName">Student Middle:</label>
+                    <input type="text" id="studentMiddle" placeholder="Enter full name" required>
+                </div>
+
+                <div class="form-select">
+                    <label for="studentGrade">Grade/Year:</label>
+                    <select name="studentGrade" id="studentGrade">
+                        <option value="7">7</option>
+                        <option value="8">8</option>
+                        <option value="9">9</option>
+                        <option value="10">10</option>
+                        <option value="11">11</option>
+                        <option value="12">12</option>
+                    </select>
+                        <!-- <input type="text" id="studentGrade" placeholder="e.g., Grade 10, Year 2" required> -->
+                </div>
+
+
+                <div id="registerStatus"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
+    <script>
+        let registerVideo, registerCanvas;
+        let modelsLoaded = false;
+
+        async function loadModels() {
+            if (modelsLoaded) return;
+            try {
+                const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+                await Promise.all([
+                    faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+                ]);
+                modelsLoaded = true;
+                console.log('✅ Face-API models loaded successfully');
+            } catch (error) {
+                console.error('❌ Error loading models:', error);
+                throw error;
+            }
+        }
+
+        async function initCamera() {
+            document.getElementById('registerLoading').style.display = 'block';
+            document.getElementById('registerForm').style.display = 'none';
+            
+            try {
+                if (typeof faceapi === 'undefined') {
+                    throw new Error('Face-API library not loaded. Please refresh the page.');
+                }
+                
+                await loadModels();
+                
+                registerVideo = document.getElementById('registerVideo');
+                registerCanvas = document.getElementById('registerCanvas');
+
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: 640, height: 480 } 
+                });
+                registerVideo.srcObject = stream;
+                
+                registerVideo.addEventListener('loadedmetadata', () => {
+                    registerCanvas.width = registerVideo.videoWidth;
+                    registerCanvas.height = registerVideo.videoHeight;
+                });
+
+                document.getElementById('registerLoading').style.display = 'none';
+                document.getElementById('registerForm').style.display = 'block';
+                
+                detectFace();
+            } catch (err) {
+                document.getElementById('registerLoading').style.display = 'none';
+                showStatus('error', 'Error: ' + err.message);
+                console.error('Init error:', err);
+            }
+        }
+
+        async function detectFace() {
+            if (!registerVideo || registerVideo.paused) return;
+
+            const detections = await faceapi.detectAllFaces(registerVideo)
+                .withFaceLandmarks()
+                .withFaceDescriptors();
+
+            const ctx = registerCanvas.getContext('2d');
+            ctx.clearRect(0, 0, registerCanvas.width, registerCanvas.height);
+
+            if (detections.length > 0) {
+                faceapi.draw.drawDetections(registerCanvas, detections);
+                faceapi.draw.drawFaceLandmarks(registerCanvas, detections);
+            }
+
+            requestAnimationFrame(detectFace);
+        }
+
+        async function captureAndRegister() {
+            const studentId = document.getElementById('studentId').value.trim();
+            const studentName = document.getElementById('studentName').value.trim();
+            const studentLast = document.getElementById('studentLast').value.trim();
+            const studentMiddle = document.getElementById('studentMiddle').value.trim();
+            const studentGrade = document.getElementById('studentGrade').value.trim();
+
+            if (!studentId || !studentName || !studentGrade || !studentLast || !studentMiddle) {
+                showStatus('error', 'Please fill in all fields');
+                return;
+            }
+
+            showStatus('info', 'Detecting face...');
+
+            const detection = await faceapi.detectSingleFace(registerVideo)
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+
+            if (!detection) {
+                showStatus('error', 'No face detected. Please position your face clearly in the camera.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('student_id', studentId);
+            formData.append('student_name', studentName);
+            formData.append('student_last', studentLast);
+            formData.append('student_middle', studentMiddle);
+            formData.append('grade', studentGrade);
+            formData.append('face_descriptor', JSON.stringify(Array.from(detection.descriptor)));
+
+            try {
+                const response = await fetch('register.php', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const text = await response.text();
+                let result;
+                try {
+                    result = JSON.parse(text);
+                } catch (e) {
+                    throw new Error('Server returned invalid response. Make sure PHP server is running.');
+                }
+
+                if (result.success) {
+                    showStatus('success', '✅ Student registered successfully!');
+                    document.getElementById('studentId').value = '';
+                    document.getElementById('studentName').value = '';
+                    document.getElementById('studentGrade').value = '';
+                } else {
+                    showStatus('error', result.message || 'Registration failed');
+                }
+            } catch (err) {
+                showStatus('error', 'Error: ' + err.message);
+                console.error('Registration error:', err);
+            }
+        }
+
+        function showStatus(type, message) {
+            const element = document.getElementById('registerStatus');
+            element.className = `status ${type}`;
+            element.textContent = message;
+            element.style.display = 'block';
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                if (typeof faceapi === 'undefined') {
+                    console.error('Face-API failed to load');
+                    document.getElementById('registerLoading').innerHTML = 
+                        '<div class="status error">Failed to load Face-API. Please refresh the page.</div>';
+                } else {
+                    initCamera();
+                }
+            }, 500);
+        });
+    </script>
+</body>
+</html>

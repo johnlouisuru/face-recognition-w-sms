@@ -1,0 +1,669 @@
+<!-- register.html - Student Registration with Parent Information -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register Student</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .nav {
+            background: #f8f9fa;
+            padding: 15px 30px;
+            border-bottom: 2px solid #dee2e6;
+        }
+        .nav a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+        .nav a:hover {
+            text-decoration: underline;
+        }
+        .content {
+            padding: 40px;
+        }
+        .video-container {
+            position: relative;
+            max-width: 640px;
+            margin: 0 auto 30px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        #registerVideo {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        .form-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            border-left: 4px solid #667eea;
+        }
+        .form-section h3 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+        input[type="text"],
+        input[type="tel"],
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border 0.3s;
+        }
+        input[type="text"]:focus,
+        input[type="tel"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .btn {
+            padding: 15px 40px;
+            font-size: 1.1em;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 10px 5px;
+        }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        .btn-success:hover {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .status {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 600;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+        .section-new {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            border-left: 4px solid #667eea;
+        }
+        .section-new input {
+            margin-top: 10px;
+        }
+        #newSectionInputs {
+            display: none;
+        }
+        /* Toast Notification Styles */
+        .toast-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .toast {
+            min-width: 300px;
+            max-width: 400px;
+            padding: 16px 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.3s ease-out;
+            color: white;
+            font-weight: 600;
+        }
+        .toast.success {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+        .toast.error {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+        }
+        .toast.info {
+            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+        }
+        .toast-icon {
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+        .toast-message {
+            flex: 1;
+            line-height: 1.4;
+        }
+        .toast-close {
+            background: rgba(255,255,255,0.3);
+            border: none;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            flex-shrink: 0;
+            transition: background 0.2s;
+        }
+        .toast-close:hover {
+            background: rgba(255,255,255,0.5);
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
+        .toast.hiding {
+            animation: slideOut 0.3s ease-out forwards;
+        }
+        #registerVideo, #registerCanvas {
+            transform: scaleX(-1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>➕ Register New Student</h1>
+            <p>Capture face and student information</p>
+        </div>
+
+        <div class="nav">
+            <a href="index.html">← Back to Dashboard</a>
+        </div>
+
+        <div class="content">
+            <div class="loading" id="registerLoading">Loading face detection models...</div>
+            
+            <div id="registerForm" style="display:none;">
+                <div class="video-container">
+                    <video id="registerVideo" autoplay muted></video>
+                    <canvas id="registerCanvas"></canvas>
+                </div>
+                <div id="registerStatus" class="status" style="display:none;"></div>
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <button class="btn btn-success" onclick="captureAndRegister()">📷 Capture & Register Face</button>
+                </div>
+
+                <!-- Student Information Section -->
+                <div class="form-section">
+                    <h3>👨‍🎓 Student Information</h3>
+                    
+                    <div class="form-group">
+                        <label for="studentId">Student ID: *</label>
+                        <input type="text" id="studentId" pattern="\d{1,12}" maxlength="12" placeholder="Enter student ID" required />
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="studentName">First Name: *</label>
+                            <input type="text" id="studentName" placeholder="First name" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="studentLast">Last Name: *</label>
+                            <input type="text" id="studentLast" placeholder="Last name" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="studentMiddle">Middle Name:</label>
+                        <input type="text" id="studentMiddle" placeholder="Middle name (optional)">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="studentGrade">Grade/Year: *</label>
+                            <select id="studentGrade" required>
+                                <option value="">-- Select Grade --</option>
+                                <option value="7">Grade 7</option>
+                                <option value="8">Grade 8</option>
+                                <option value="9">Grade 9</option>
+                                <option value="10">Grade 10</option>
+                                <option value="11">Grade 11</option>
+                                <option value="12">Grade 12</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="sectionSelect">Section: *</label>
+                            <select id="sectionSelect" onchange="toggleNewSection()" required>
+                                <option value="">-- Select Section --</option>
+                                <option value="__new__">+ Add New Section</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- New Section Input -->
+                    <div id="newSectionInputs" class="section-new">
+                        <strong>Create New Section:</strong>
+                        <div class="form-row" style="margin-top: 15px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label for="newSectionId">Section ID:</label>
+                                <input type="text" id="newSectionId" placeholder="e.g., SEC-A, 7-EINSTEIN">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label for="newSectionName">Section Name:</label>
+                                <input type="text" id="newSectionName" placeholder="e.g., Einstein, Section A">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Parent/Guardian Information Section -->
+                <div class="form-section">
+                    <h3>👨‍👩‍👦 Parent/Guardian Information</h3>
+                    
+                    <div class="form-group">
+                        <label for="parentFullname">Parent/Guardian Full Name: *</label>
+                        <input type="text" id="parentFullname" placeholder="Enter parent's full name" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="parentContact">Contact Number: *</label>
+                        <input type="tel" id="parentContact" placeholder="e.g., 09123456789" pattern="[0-9]{11}" maxlength="11" required>
+                        <small style="color: #666; display: block; margin-top: 5px;">Format: 11-digit mobile number</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
+    <script>
+        let registerVideo, registerCanvas;
+        let modelsLoaded = false;
+        let sections = [];
+
+        // Toast Notification System
+        function showToast(type, message, duration = 5000) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            // Icon based on type
+            const icons = {
+                success: '✅',
+                error: '❌',
+                info: 'ℹ️'
+            };
+            
+            toast.innerHTML = `
+                <div class="toast-icon">${icons[type]}</div>
+                <div class="toast-message">${message}</div>
+                <button class="toast-close" onclick="closeToast(this)">×</button>
+            `;
+            
+            container.appendChild(toast);
+            
+            // Auto remove after duration
+            setTimeout(() => {
+                removeToast(toast);
+            }, duration);
+        }
+
+        function closeToast(button) {
+            const toast = button.closest('.toast');
+            removeToast(toast);
+        }
+
+        function removeToast(toast) {
+            toast.classList.add('hiding');
+            setTimeout(() => {
+                toast.remove();
+            }, 300);
+        }
+
+        async function loadModels() {
+            if (modelsLoaded) return;
+            try {
+                const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+                await Promise.all([
+                    faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+                ]);
+                modelsLoaded = true;
+                console.log('✅ Face-API models loaded successfully');
+            } catch (error) {
+                console.error('❌ Error loading models:', error);
+                throw error;
+            }
+        }
+
+        async function loadSections() {
+            try {
+                const response = await fetch('get_sections.php');
+                sections = await response.json();
+                
+                const sectionSelect = document.getElementById('sectionSelect');
+                sectionSelect.innerHTML = '<option value="">-- Select Section --</option>';
+                
+                sections.forEach(section => {
+                    sectionSelect.innerHTML += `<option value="${section.section_id}">${section.section_name}</option>`;
+                });
+                
+                sectionSelect.innerHTML += '<option value="__new__">+ Add New Section</option>';
+                
+                console.log(`✅ Loaded ${sections.length} sections`);
+            } catch (err) {
+                console.error('Error loading sections:', err);
+            }
+        }
+
+        function toggleNewSection() {
+            const sectionSelect = document.getElementById('sectionSelect');
+            const newSectionInputs = document.getElementById('newSectionInputs');
+            
+            if (sectionSelect.value === '__new__') {
+                newSectionInputs.style.display = 'block';
+            } else {
+                newSectionInputs.style.display = 'none';
+            }
+        }
+
+        async function initCamera() {
+            document.getElementById('registerLoading').style.display = 'block';
+            document.getElementById('registerForm').style.display = 'none';
+            
+            try {
+                if (typeof faceapi === 'undefined') {
+                    throw new Error('Face-API library not loaded. Please refresh the page.');
+                }
+                
+                await loadModels();
+                await loadSections();
+                
+                registerVideo = document.getElementById('registerVideo');
+                registerCanvas = document.getElementById('registerCanvas');
+
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: 640, height: 480 } 
+                });
+                registerVideo.srcObject = stream;
+                
+                registerVideo.addEventListener('loadedmetadata', () => {
+                    registerCanvas.width = registerVideo.videoWidth;
+                    registerCanvas.height = registerVideo.videoHeight;
+                });
+
+                document.getElementById('registerLoading').style.display = 'none';
+                document.getElementById('registerForm').style.display = 'block';
+                
+                detectFace();
+            } catch (err) {
+                document.getElementById('registerLoading').style.display = 'none';
+                showStatus('error', 'Error: ' + err.message);
+                console.error('Init error:', err);
+            }
+        }
+
+        async function detectFace() {
+            if (!registerVideo || registerVideo.paused) return;
+
+            const detections = await faceapi.detectAllFaces(registerVideo)
+                .withFaceLandmarks()
+                .withFaceDescriptors();
+
+            const ctx = registerCanvas.getContext('2d');
+            ctx.clearRect(0, 0, registerCanvas.width, registerCanvas.height);
+
+            if (detections.length > 0) {
+                faceapi.draw.drawDetections(registerCanvas, detections);
+                faceapi.draw.drawFaceLandmarks(registerCanvas, detections);
+            }
+
+            requestAnimationFrame(detectFace);
+        }
+
+        async function captureAndRegister() {
+            // Get all form values
+            const studentId = document.getElementById('studentId').value.trim();
+            const studentName = document.getElementById('studentName').value.trim();
+            const studentLast = document.getElementById('studentLast').value.trim();
+            const studentMiddle = document.getElementById('studentMiddle').value.trim();
+            const studentGrade = document.getElementById('studentGrade').value;
+            const sectionSelect = document.getElementById('sectionSelect').value;
+            const parentFullname = document.getElementById('parentFullname').value.trim();
+            const parentContact = document.getElementById('parentContact').value.trim();
+
+            // Validate required fields
+            if (!studentId || !studentName || !studentLast || !studentGrade || !sectionSelect) {
+                showToast('error', 'Please fill in all required student fields (*)');
+                return;
+            }
+
+            // Validate parent information
+            if (!parentFullname || !parentContact) {
+                showToast('error', 'Please fill in all parent/guardian information (*)');
+                return;
+            }
+
+            // Validate contact number format (11 digits)
+            if (!/^[0-9]{11}$/.test(parentContact)) {
+                showToast('error', 'Contact number must be exactly 11 digits');
+                return;
+            }
+
+            // Handle new section
+            let sectionId = sectionSelect;
+            let sectionName = '';
+
+            if (sectionSelect === '__new__') {
+                const newSectionId = document.getElementById('newSectionId').value.trim();
+                const newSectionName = document.getElementById('newSectionName').value.trim();
+                
+                if (!newSectionId || !newSectionName) {
+                    showToast('error', 'Please provide both Section ID and Section Name for new section');
+                    return;
+                }
+                
+                sectionId = newSectionId;
+                sectionName = newSectionName;
+            } else {
+                // Find section name from existing sections
+                const section = sections.find(s => s.section_id === sectionSelect);
+                sectionName = section ? section.section_name : sectionSelect;
+            }
+
+            //showToast('info', 'Detecting face...', 3000);
+
+            const detection = await faceapi.detectSingleFace(registerVideo)
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+
+            if (!detection) {
+                showToast('error', 'No face detected. Please position your face clearly in the camera.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('student_id', studentId);
+            formData.append('student_name', studentName);
+            formData.append('student_last', studentLast);
+            formData.append('student_middle', studentMiddle);
+            formData.append('grade', studentGrade);
+            formData.append('section_id', sectionId);
+            formData.append('section_name', sectionName);
+            formData.append('face_descriptor', JSON.stringify(Array.from(detection.descriptor)));
+            // Add parent information
+            formData.append('parent_fullname', parentFullname);
+            formData.append('parent_contact', parentContact);
+
+            try {
+                const response = await fetch('register.php', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const text = await response.text();
+                console.log('Raw server response:', text);
+                
+                let result;
+                try {
+                    result = JSON.parse(text);
+                } catch (e) {
+                    console.error('Failed to parse JSON. Server returned:', text);
+                    showStatus('error', 'Server error: ' + text.substring(0, 200));
+                    return;
+                }
+
+                if (result.success) {
+                    showStatus('success', '✅ Student and parent information registered successfully!');
+                    showToast('success', '✅ Student and parent information registered successfully!');
+                    
+                    // Clear form
+                    document.getElementById('studentId').value = '';
+                    document.getElementById('studentName').value = '';
+                    document.getElementById('studentLast').value = '';
+                    document.getElementById('studentMiddle').value = '';
+                    document.getElementById('studentGrade').value = '';
+                    document.getElementById('sectionSelect').value = '';
+                    document.getElementById('parentFullname').value = '';
+                    document.getElementById('parentContact').value = '';
+                    document.getElementById('newSectionId').value = '';
+                    document.getElementById('newSectionName').value = '';
+                    document.getElementById('newSectionInputs').style.display = 'none';
+                    
+                    // Reload sections if new section was added
+                    if (sectionSelect === '__new__') {
+                        await loadSections();
+                    }
+                } else {
+                    showStatus('error', result.message || 'Registration failed');
+                }
+            } catch (err) {
+                showStatus('error', 'Error: ' + err.message);
+                console.error('Registration error:', err);
+            }
+        }
+
+        function showStatus(type, message) {
+            const element = document.getElementById('registerStatus'); 
+            if (!element) { 
+                console.error("registerStatus element not found in DOM"); 
+                return; 
+            } 
+            element.className = `status ${type}`; 
+            element.textContent = message; 
+            element.style.display = 'block';
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                if (typeof faceapi === 'undefined') {
+                    console.error('Face-API failed to load');
+                    document.getElementById('registerLoading').innerHTML = 
+                        '<div class="status error">Failed to load Face-API. Please refresh the page.</div>';
+                } else {
+                    initCamera();
+                }
+            }, 500);
+        });
+    </script>
+</body>
+</html>
