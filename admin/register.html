@@ -271,6 +271,11 @@
 
         <div class="nav">
             <a href="index.html">← Back to Dashboard</a>
+            &nbsp; &nbsp; |  &nbsp;
+            <a href="accounts_management.php">Accounts ➔</a>
+        </div>
+        <div class="nav">
+            
         </div>
 
         <div class="content">
@@ -283,7 +288,7 @@
                 </div>
                 <div id="registerStatus" class="status" style="display:none;"></div>
                 <div style="text-align: center; margin-bottom: 30px;">
-                    <button class="btn btn-success" onclick="captureAndRegister()">📷 Capture & Register Face</button>
+                    <button class="btn btn-success" id="registerStudent" onclick="captureAndRegister()">📷 Capture & Register Face</button>
                 </div>
 
                 <!-- Student Information Section -->
@@ -593,7 +598,8 @@
             // Add parent information
             formData.append('parent_fullname', parentFullname);
             formData.append('parent_contact', parentContact);
-
+            document.getElementById('registerStudent').disabled = true;
+            document.getElementById('registerStudent').textContent = '⏳ Registering...';
             try {
                 const response = await fetch('register.php', {
                     method: 'POST',
