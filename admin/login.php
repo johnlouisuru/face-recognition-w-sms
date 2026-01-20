@@ -5,8 +5,8 @@ if(file_exists('db-config/security.php')){
     die('Database configuration file not found.');
 }
 // Check if user is logged in
-if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] != true) {
-    header('Location: login.php');
+if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] == true) {
+    header('Location: dashboard.php');
     exit;
 }
 ?>
