@@ -5,16 +5,16 @@
 // require_once 'db-config/security.php';
 // header('location: login.php');
 // exit;
-if(file_exists('db-config/security.php')){
-    require_once 'db-config/security.php';
-} else {
-    die('Database configuration file not found.');
-}
+// if(file_exists('db-config/security.php')){
+//     require_once 'db-config/security.php';
+// } else {
+//     die('Database configuration file not found.');
+// }
 // Check if user is logged in
-if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] != true) {
-    header('Location: login.php');
-    exit;
-}
+// if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] != true) {
+//     header('Location: login.php');
+//     exit;
+// }
 ?>
 <!DOCTYPE html>
 <html lang="en">
