@@ -231,8 +231,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>✅ Mark Attendance</h1>
-            <p>Automatic face recognition attendance</p>
+            <h1>✅ Intelligent Attendance Monitoring System</h1>
+            <p>Tinajeros National High School</p>
         </div>
 
         <div class="nav">
@@ -275,7 +275,7 @@
                         </button>
                     </div>
                 </div>
-
+                <div id="attendanceStatus"></div>
                 <div class="video-container">
                     <video id="video" autoplay muted></video>
                     <canvas id="canvas"></canvas>
@@ -296,7 +296,7 @@
                     <button class="btn btn-danger" onclick="stopAttendance()">⏸️ Stop</button>
                 </div>
 
-                <div id="attendanceStatus"></div>
+                
             </div>
         </div>
     </div>
