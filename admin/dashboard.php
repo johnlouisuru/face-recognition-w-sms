@@ -121,7 +121,7 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
                 <div class="card">
                     <div class="card-header">
                         <h5 class="card-title mb-0">
-                            <i class="bi bi-pie-chart-fill"></i> Grade Distribution
+                            <i class="bi bi-pie-chart-fill"></i> Grade Level Distribution
                         </h5>
                     </div>
                     <div class="card-body">
