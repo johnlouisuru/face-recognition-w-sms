@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -30,15 +29,38 @@
             color: white;
             padding: 30px;
             text-align: center;
+            position: relative;
         }
         .header h1 {
             font-size: 2.5em;
             margin-bottom: 10px;
         }
+        .auto-refresh-indicator {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .refresh-icon {
+            animation: spin 2s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
         .nav {
             background: #f8f9fa;
             padding: 15px 30px;
             border-bottom: 2px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         .nav a {
             color: #667eea;
@@ -48,6 +70,29 @@
         }
         .nav a:hover {
             text-decoration: underline;
+        }
+        .refresh-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .refresh-controls label {
+            font-size: 0.9em;
+            color: #666;
+        }
+        .refresh-controls select {
+            padding: 5px 10px;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            background: white;
+        }
+        .last-updated {
+            font-size: 0.85em;
+            color: #666;
+            text-align: center;
+            padding: 5px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
         }
         .content {
             padding: 30px;
@@ -64,6 +109,15 @@
             padding: 25px;
             border-radius: 10px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        .stat-card.updating {
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; }
+            100% { opacity: 1; }
         }
         .stat-card h3 {
             font-size: 0.9em;
@@ -231,10 +285,29 @@
         <div class="header">
             <h1>📊 Attendance Dashboard</h1>
             <p>Monitor attendance, view reports, and analyze trends</p>
+            <div class="auto-refresh-indicator" id="refreshIndicator">
+                <span class="refresh-icon">🔄</span>
+                <span>Auto-refresh: <span id="countdown">10s</span></span>
+            </div>
+        </div>
+
+        <div class="last-updated" id="lastUpdated">
+            Last updated: <span id="lastUpdatedTime">Never</span>
         </div>
 
         <div class="nav">
             <a href="index.html">← Back to Dashboard</a>
+            <div class="refresh-controls">
+                <label for="refreshInterval">Auto-refresh:</label>
+                <select id="refreshInterval" onchange="changeRefreshInterval()">
+                    <option value="5000" selected>5 seconds</option>
+                    <option value="10000" >10 seconds</option>
+                    <option value="30000">30 seconds</option>
+                    <option value="60000">1 minute</option>
+                    <option value="300000">5 minutes</option>
+                    <option value="0">Off</option>
+                </select>
+            </div>
         </div>
 
         <div class="content">
@@ -293,6 +366,7 @@
                     <div style="display: flex; gap: 10px; align-items: end;">
                         <button class="btn btn-primary" onclick="applyFilters()">🔍 Filter</button>
                         <button class="btn btn-success" onclick="exportReport()">📥 Export</button>
+                        <button class="btn" onclick="manualRefresh()" title="Refresh Now">🔄 Now</button>
                     </div>
                 </div>
             </div>
@@ -342,11 +416,16 @@
     <script>
         let allAttendance = [];
         let allStudents = [];
+        let refreshInterval = 5000; // 10 seconds default
+        let refreshTimer = null;
+        let countdownTimer = null;
+        let isRefreshing = false;
 
         // Initialize
         window.addEventListener('DOMContentLoaded', () => {
             setDefaultDates();
             loadData();
+            startAutoRefresh();
         });
 
         function setDefaultDates() {
@@ -363,23 +442,40 @@
         }
 
         async function loadData() {
+            if (isRefreshing) return;
+            
+            isRefreshing = true;
+            showRefreshingState(true);
+            
             try {
+                // Load sections first
+                const sectionsResponse = await fetch('get_sections.php');
+                allSections = await sectionsResponse.json();
+                
+                // Populate section filter
+                const sectionFilter = document.getElementById('sectionFilter');
+                sectionFilter.innerHTML = '<option value="">All Sections</option>';
+                allSections.forEach(section => {
+                    sectionFilter.innerHTML += `<option value="${section.section_id}">${section.section_name}</option>`;
+                });
+                
                 // Load students
                 const studentsResponse = await fetch('get_students.php');
                 allStudents = await studentsResponse.json();
                 
-                // Populate student filter
-                const studentFilter = document.getElementById('studentFilter');
-                studentFilter.innerHTML = '<option value="">All Students</option>';
-                allStudents.forEach(student => {
-                    studentFilter.innerHTML += `<option value="${student.student_id}">${student.student_name} (${student.student_id})</option>`;
-                });
+                // Populate student filter with all students initially
+                populateStudentFilter(allStudents);
 
                 // Load attendance
                 await loadAttendance();
                 
+                // Update last updated time
+                updateLastUpdatedTime();
+                
             } catch (error) {
                 console.error('Error loading data:', error);
+                showRefreshingState(false);
+                isRefreshing = false;
             }
         }
 
@@ -390,34 +486,39 @@
                 
                 updateStatistics();
                 applyFilters();
+                
             } catch (error) {
                 console.error('Error loading attendance:', error);
+            } finally {
+                showRefreshingState(false);
+                isRefreshing = false;
             }
         }
 
         function updateStatistics() {
-    const today = new Date().toISOString().split('T')[0];
-    const todayRecords = allAttendance.filter(record => {
-        const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
-        return recordDate === today;
-    });
+            const today = new Date().toISOString().split('T')[0];
+            const todayRecords = allAttendance.filter(record => {
+                const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+                return recordDate === today;
+            });
 
-    // Get unique students who marked attendance today
-    const presentStudentIds = [...new Set(todayRecords.map(r => r.student_id))];
-    const presentCount = presentStudentIds.length;
-    const totalCount = allStudents.length;
-    const absentCount = totalCount - presentCount;
-    const rate = totalCount > 0 ? ((presentCount / totalCount) * 100).toFixed(1) : 0;
+            // Get unique students who marked attendance today
+            const presentStudentIds = [...new Set(todayRecords.map(r => r.student_id))];
+            const presentCount = presentStudentIds.length;
+            const totalCount = allStudents.length;
+            const absentCount = totalCount - presentCount;
+            const rate = totalCount > 0 ? ((presentCount / totalCount) * 100).toFixed(1) : 0;
 
-    document.getElementById('totalStudents').textContent = totalCount;
-    document.getElementById('presentToday').textContent = presentCount;
-    document.getElementById('absentToday').textContent = absentCount;
-    document.getElementById('attendanceRate').textContent = rate + '%';
-}
+            document.getElementById('totalStudents').textContent = totalCount;
+            document.getElementById('presentToday').textContent = presentCount;
+            document.getElementById('absentToday').textContent = absentCount;
+            document.getElementById('attendanceRate').textContent = rate + '%';
+        }
 
         function applyFilters() {
             const startDate = document.getElementById('startDate').value;
             const endDate = document.getElementById('endDate').value;
+            const sectionId = document.getElementById('sectionFilter').value;
             const studentId = document.getElementById('studentFilter').value;
             const status = document.getElementById('statusFilter').value;
 
@@ -427,6 +528,12 @@
                 // Date filter
                 if (startDate && recordDate < startDate) return false;
                 if (endDate && recordDate > endDate) return false;
+                
+                // Section filter
+                if (sectionId) {
+                    const student = allStudents.find(s => s.student_id === record.student_id);
+                    if (!student || student.section_id !== sectionId) return false;
+                }
                 
                 // Student filter
                 if (studentId && record.student_id !== studentId) return false;
@@ -444,186 +551,186 @@
             displaySummary(filtered);
         }
 
-       function displayTodayAttendance(data) {
-    const today = new Date().toISOString().split('T')[0];
-    const todayData = data.filter(record => {
-        const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
-        return recordDate === today;
-    });
+        function displayTodayAttendance(data) {
+            const today = new Date().toISOString().split('T')[0];
+            const todayData = data.filter(record => {
+                const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+                return recordDate === today;
+            });
 
-    // Get current filter selections
-    const sectionId = document.getElementById('sectionFilter').value;
-    const studentId = document.getElementById('studentFilter').value;
+            // Get current filter selections
+            const sectionId = document.getElementById('sectionFilter').value;
+            const studentId = document.getElementById('studentFilter').value;
 
-    // Filter students based on current filters
-    let studentsToShow = allStudents;
-    if (sectionId) {
-        studentsToShow = studentsToShow.filter(s => s.section_id === sectionId);
-    }
-    if (studentId) {
-        studentsToShow = studentsToShow.filter(s => s.student_id === studentId);
-    }
-
-    let html = '';
-    if (studentsToShow.length === 0) {
-        html = `<div class="empty-state">
-            <div class="empty-state-icon">📭</div>
-            <p>No students found</p>
-        </div>`;
-    } else {
-        html = `<table class="attendance-table">
-            <thead>
-                <tr>
-                    <th>Student ID</th>
-                    <th>Name</th>
-                    <th>Grade</th>
-                    <th>Section</th>
-                    <th>Time In 📲</th>
-                    <th>Time Out 📲</th>
-                    <th>Duration</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>`;
-        
-        // Display all students (present and absent)
-        studentsToShow.forEach(student => {
-            // Find if student has attendance record for today
-            const record = todayData.find(r => r.student_id === student.student_id);
-            
-            if (record) {
-                // Student has attendance record
-                const timeIn = record.time_in ? new Date(record.time_in).toLocaleTimeString() : '-';
-                const timeOut = record.time_out ? new Date(record.time_out).toLocaleTimeString() : '-';
-                const duration = calculateDuration(record.time_in, record.time_out);
-                const status = getStatus(record);
-                
-                html += `<tr>
-                    <td>${student.student_id}</td>
-                    <td>${student.student_name}</td>
-                    <td>${student.grade}</td>
-                    <td>${student.section_name || 'N/A'}</td>
-                    <td>${timeIn}</td>
-                    <td>${timeOut}</td>
-                    <td class="duration">${duration}</td>
-                    <td><span class="status-badge ${status.class}">${status.text}</span></td>
-                </tr>`;
-            } else {
-                // Student is absent (no attendance record)
-                html += `<tr>
-                    <td>${student.student_id}</td>
-                    <td>${student.student_name}</td>
-                    <td>${student.grade}</td>
-                    <td>${student.section_name || 'N/A'}</td>
-                    <td>-</td>
-                    <td>-</td>
-                    <td>-</td>
-                    <td><span class="status-badge status-absent">Absent</span></td>
-                </tr>`;
+            // Filter students based on current filters
+            let studentsToShow = allStudents;
+            if (sectionId) {
+                studentsToShow = studentsToShow.filter(s => s.section_id === sectionId);
             }
-        });
-        
-        html += `</tbody></table>`;
-    }
-    
-    document.getElementById('todayContent').innerHTML = html;
-}
+            if (studentId) {
+                studentsToShow = studentsToShow.filter(s => s.student_id === studentId);
+            }
+
+            let html = '';
+            if (studentsToShow.length === 0) {
+                html = `<div class="empty-state">
+                    <div class="empty-state-icon">📭</div>
+                    <p>No students found</p>
+                </div>`;
+            } else {
+                html = `<table class="attendance-table">
+                    <thead>
+                        <tr>
+                            <th>Student ID</th>
+                            <th>Name</th>
+                            <th>Grade</th>
+                            <th>Section</th>
+                            <th>Time In 📲</th>
+                            <th>Time Out 📲</th>
+                            <th>Duration</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+                
+                // Display all students (present and absent)
+                studentsToShow.forEach(student => {
+                    // Find if student has attendance record for today
+                    const record = todayData.find(r => r.student_id === student.student_id);
+                    
+                    if (record) {
+                        // Student has attendance record
+                        const timeIn = record.time_in ? new Date(record.time_in).toLocaleTimeString() : '-';
+                        const timeOut = record.time_out ? new Date(record.time_out).toLocaleTimeString() : '-';
+                        const duration = calculateDuration(record.time_in, record.time_out);
+                        const status = getStatus(record);
+                        
+                        html += `<tr>
+                            <td>${student.student_id}</td>
+                            <td>${student.student_name}</td>
+                            <td>${student.grade}</td>
+                            <td>${student.section_name || 'N/A'}</td>
+                            <td>${timeIn}</td>
+                            <td>${timeOut}</td>
+                            <td class="duration">${duration}</td>
+                            <td><span class="status-badge ${status.class}">${status.text}</span></td>
+                        </tr>`;
+                    } else {
+                        // Student is absent (no attendance record)
+                        html += `<tr>
+                            <td>${student.student_id}</td>
+                            <td>${student.student_name}</td>
+                            <td>${student.grade}</td>
+                            <td>${student.section_name || 'N/A'}</td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td><span class="status-badge status-absent">Absent</span></td>
+                        </tr>`;
+                    }
+                });
+                
+                html += `</tbody></table>`;
+            }
+            
+            document.getElementById('todayContent').innerHTML = html;
+        }
 
         let allSections = [];
 
-// Update loadData function - add section loading
-async function loadData() {
-    try {
-        // Load sections first
-        const sectionsResponse = await fetch('get_sections.php');
-        allSections = await sectionsResponse.json();
-        
-        // Populate section filter
-        const sectionFilter = document.getElementById('sectionFilter');
-        sectionFilter.innerHTML = '<option value="">All Sections</option>';
-        allSections.forEach(section => {
-            sectionFilter.innerHTML += `<option value="${section.section_id}">${section.section_name}</option>`;
-        });
-        
-        // Load students
-        const studentsResponse = await fetch('get_students.php');
-        allStudents = await studentsResponse.json();
-        
-        // Populate student filter with all students initially
-        populateStudentFilter(allStudents);
+        // Update loadData function - add section loading
+        async function loadData() {
+            try {
+                // Load sections first
+                const sectionsResponse = await fetch('get_sections.php');
+                allSections = await sectionsResponse.json();
+                
+                // Populate section filter
+                const sectionFilter = document.getElementById('sectionFilter');
+                sectionFilter.innerHTML = '<option value="">All Sections</option>';
+                allSections.forEach(section => {
+                    sectionFilter.innerHTML += `<option value="${section.section_id}">${section.section_name}</option>`;
+                });
+                
+                // Load students
+                const studentsResponse = await fetch('get_students.php');
+                allStudents = await studentsResponse.json();
+                
+                // Populate student filter with all students initially
+                populateStudentFilter(allStudents);
 
-        // Load attendance
-        await loadAttendance();
-        
-    } catch (error) {
-        console.error('Error loading data:', error);
-    }
-}
-
-// Add this new function
-function populateStudentFilter(students) {
-    const studentFilter = document.getElementById('studentFilter');
-    studentFilter.innerHTML = '<option value="">All Students</option>';
-    students.forEach(student => {
-        studentFilter.innerHTML += `<option value="${student.student_id}">${student.student_name} (${student.student_id})</option>`;
-    });
-}
-
-// Add this new function
-function onSectionFilterChange() {
-    const selectedSection = document.getElementById('sectionFilter').value;
-    
-    if (!selectedSection) {
-        // Show all students if no section selected
-        populateStudentFilter(allStudents);
-    } else {
-        // Filter students by selected section
-        const filteredStudents = allStudents.filter(student => 
-            student.section_id === selectedSection
-        );
-        populateStudentFilter(filteredStudents);
-    }
-    
-    // Reset student filter selection
-    document.getElementById('studentFilter').value = '';
-}
-
-// Update applyFilters function - add section filtering
-function applyFilters() {
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
-    const sectionId = document.getElementById('sectionFilter').value;
-    const studentId = document.getElementById('studentFilter').value;
-    const status = document.getElementById('statusFilter').value;
-
-    let filtered = allAttendance.filter(record => {
-        const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
-        
-        // Date filter
-        if (startDate && recordDate < startDate) return false;
-        if (endDate && recordDate > endDate) return false;
-        
-        // Section filter
-        if (sectionId) {
-            const student = allStudents.find(s => s.student_id === record.student_id);
-            if (!student || student.section_id !== sectionId) return false;
+                // Load attendance
+                await loadAttendance();
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+            }
         }
-        
-        // Student filter
-        if (studentId && record.student_id !== studentId) return false;
-        
-        // Status filter
-        if (status === 'complete' && (!record.time_in || !record.time_out)) return false;
-        if (status === 'incomplete' && record.time_in && record.time_out) return false;
-        
-        return true;
-    });
 
-    displayTodayAttendance(filtered);
-    displayHistory(filtered);
-    displayStudentReport(filtered);
-    displaySummary(filtered);
-}
+        // Add this new function
+        function populateStudentFilter(students) {
+            const studentFilter = document.getElementById('studentFilter');
+            studentFilter.innerHTML = '<option value="">All Students</option>';
+            students.forEach(student => {
+                studentFilter.innerHTML += `<option value="${student.student_id}">${student.student_name} (${student.student_id})</option>`;
+            });
+        }
+
+        // Add this new function
+        function onSectionFilterChange() {
+            const selectedSection = document.getElementById('sectionFilter').value;
+            
+            if (!selectedSection) {
+                // Show all students if no section selected
+                populateStudentFilter(allStudents);
+            } else {
+                // Filter students by selected section
+                const filteredStudents = allStudents.filter(student => 
+                    student.section_id === selectedSection
+                );
+                populateStudentFilter(filteredStudents);
+            }
+            
+            // Reset student filter selection
+            document.getElementById('studentFilter').value = '';
+        }
+
+        // Update applyFilters function - add section filtering
+        function applyFilters() {
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            const sectionId = document.getElementById('sectionFilter').value;
+            const studentId = document.getElementById('studentFilter').value;
+            const status = document.getElementById('statusFilter').value;
+
+            let filtered = allAttendance.filter(record => {
+                const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+                
+                // Date filter
+                if (startDate && recordDate < startDate) return false;
+                if (endDate && recordDate > endDate) return false;
+                
+                // Section filter
+                if (sectionId) {
+                    const student = allStudents.find(s => s.student_id === record.student_id);
+                    if (!student || student.section_id !== sectionId) return false;
+                }
+                
+                // Student filter
+                if (studentId && record.student_id !== studentId) return false;
+                
+                // Status filter
+                if (status === 'complete' && (!record.time_in || !record.time_out)) return false;
+                if (status === 'incomplete' && record.time_in && record.time_out) return false;
+                
+                return true;
+            });
+
+            displayTodayAttendance(filtered);
+            displayHistory(filtered);
+            displayStudentReport(filtered);
+            displaySummary(filtered);
+        }
 
         function displayHistory(data) {
             let html = '';
@@ -813,7 +920,7 @@ function applyFilters() {
             if (record.time_in && record.time_out) {
                 return { text: 'Complete', class: 'status-complete' };
             } else if (record.time_in) {
-                return { text: 'Incomplete', class: 'status-incomplete' };
+                return { text: 'Present', class: 'status-incomplete' };
             } else {
                 return { text: 'No Data', class: 'status-absent' };
             }
@@ -862,6 +969,105 @@ function applyFilters() {
             a.click();
             window.URL.revokeObjectURL(url);
         }
+
+        // ==================== AUTO REFRESH FUNCTIONS ====================
+
+        function startAutoRefresh() {
+            stopAutoRefresh();
+            
+            if (refreshInterval > 0) {
+                refreshTimer = setInterval(() => {
+                    loadAttendance();
+                }, refreshInterval);
+                
+                startCountdown();
+            }
+        }
+
+        function stopAutoRefresh() {
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+                refreshTimer = null;
+            }
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+                countdownTimer = null;
+            }
+        }
+
+        function changeRefreshInterval() {
+            const select = document.getElementById('refreshInterval');
+            refreshInterval = parseInt(select.value);
+            
+            if (refreshInterval === 0) {
+                stopAutoRefresh();
+                document.getElementById('countdown').textContent = 'Off';
+                document.getElementById('refreshIndicator').style.opacity = '0.5';
+            } else {
+                startAutoRefresh();
+                document.getElementById('refreshIndicator').style.opacity = '1';
+            }
+        }
+
+        function startCountdown() {
+            if (countdownTimer) clearInterval(countdownTimer);
+            
+            let secondsLeft = refreshInterval / 1000;
+            updateCountdown(secondsLeft);
+            
+            countdownTimer = setInterval(() => {
+                secondsLeft--;
+                updateCountdown(secondsLeft);
+                
+                if (secondsLeft <= 0) {
+                    secondsLeft = refreshInterval / 1000;
+                }
+            }, 1000);
+        }
+
+        function updateCountdown(seconds) {
+            document.getElementById('countdown').textContent = `${seconds}s`;
+        }
+
+        function manualRefresh() {
+            loadAttendance();
+            if (refreshInterval > 0) {
+                startCountdown();
+            }
+        }
+
+        function showRefreshingState(show) {
+            const statCards = document.querySelectorAll('.stat-card');
+            statCards.forEach(card => {
+                if (show) {
+                    card.classList.add('updating');
+                } else {
+                    card.classList.remove('updating');
+                }
+            });
+        }
+
+        function updateLastUpdatedTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('lastUpdatedTime').textContent = timeString;
+        }
+
+        // Clean up timers when page is hidden
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                stopAutoRefresh();
+            } else {
+                if (refreshInterval > 0) {
+                    startAutoRefresh();
+                }
+            }
+        });
+
     </script>
 </body>
 </html>

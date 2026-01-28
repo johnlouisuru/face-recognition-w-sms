@@ -1,4 +1,3 @@
-<!-- Refactored attendance.html with optimized section filtering -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -108,16 +107,21 @@
             border-radius: 10px;
             overflow: hidden;
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            background: #000;
         }
         #video {
             width: 100%;
             height: auto;
             display: block;
+            transform: scaleX(-1); /* Mirror the video */
         }
         canvas {
             position: absolute;
             top: 0;
             left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
         }
         .btn {
             padding: 15px 40px;
@@ -221,11 +225,16 @@
         .time-mode-btn:hover {
             border-color: #667eea;
         }
-        video, canvas {
-            width: 100%;
-            height: auto;
+        .debug-info {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+            max-height: 100px;
+            overflow-y: auto;
         }
-        
     </style>
 </head>
 <body>
@@ -276,8 +285,14 @@
                     </div>
                 </div>
                 <div id="attendanceStatus"></div>
+                
+                <!-- Debug Info -->
+                <div class="debug-info" id="debugInfo" hidden>
+                    Debug info will appear here...
+                </div>
+                
                 <div class="video-container">
-                    <video id="video" autoplay muted></video>
+                    <video id="video" autoplay muted playsinline></video>
                     <canvas id="canvas"></canvas>
                 </div>
 
@@ -294,9 +309,8 @@
                 <div style="text-align: center;">
                     <button class="btn btn-primary" id="startBtn" onclick="startAttendance()" disabled>▶️ Start Recognition</button>
                     <button class="btn btn-danger" onclick="stopAttendance()">⏸️ Stop</button>
+                    <!-- <button class="btn" onclick="testCanvasDrawing()">🔧 Test Canvas</button> -->
                 </div>
-
-                
             </div>
         </div>
     </div>
@@ -305,17 +319,26 @@
     <script>
         let video, canvas;
         let isAttendanceRunning = false;
-        let allFaceDescriptors = [];
         let filteredFaceDescriptors = [];
         let modelsLoaded = false;
         let selectedSection = '';
-        let timeMode = 1; // 1 = time_in, 2 = time_out
+        let timeMode = 1;
         let sections = [];
         const MATCH_THRESHOLD = 0.6;
+        let recognitionInterval = null;
+        
+        // Debug logging
+        function debugLog(message) {
+            const debugElement = document.getElementById('debugInfo');
+            const timestamp = new Date().toLocaleTimeString();
+            debugElement.innerHTML = `[${timestamp}] ${message}<br>` + debugElement.innerHTML;
+            console.log(message);
+        }
 
         async function loadModels() {
             if (modelsLoaded) return;
             try {
+                debugLog('Loading face detection models...');
                 const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
                 await Promise.all([
                     faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL),
@@ -323,14 +346,17 @@
                     faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
                 ]);
                 modelsLoaded = true;
-                console.log('✅ Models loaded');
+                debugLog('✅ Models loaded successfully');
+                showStatus('success', 'Face detection models loaded successfully');
             } catch (error) {
+                debugLog(`❌ Error loading models: ${error.message}`);
                 throw error;
             }
         }
 
         async function loadSections() {
             try {
+                debugLog('Loading sections...');
                 const response = await fetch('get_sections.php');
                 sections = await response.json();
                 
@@ -341,16 +367,16 @@
                     sectionFilter.innerHTML += `<option value="${section.section_id}">${section.section_name}</option>`;
                 });
                 
-                console.log(`✅ Loaded ${sections.length} sections`);
+                debugLog(`✅ Loaded ${sections.length} sections`);
             } catch (err) {
-                console.error('Error loading sections:', err);
+                debugLog(`❌ Error loading sections: ${err.message}`);
                 showStatus('error', 'Failed to load sections');
             }
         }
 
-        // 🔑 REFACTORED: Load only faces for selected section
         async function loadFacesForSection(sectionId) {
             try {
+                debugLog(`Loading faces for section ${sectionId}...`);
                 const response = await fetch(`get_students.php?section_id=${sectionId}`);
                 const text = await response.text();
                 const data = JSON.parse(text);
@@ -366,15 +392,15 @@
                             descriptor: new Float32Array(descriptor)
                         };
                     } catch (err) {
-                        console.error(`Error parsing descriptor for ${student.student_name}:`, err);
+                        debugLog(`⚠️ Error parsing descriptor for ${student.student_name}`);
                         return null;
                     }
                 }).filter(s => s !== null);
                 
-                console.log(`✅ Loaded ${filteredFaceDescriptors.length} faces for selected section`);
+                debugLog(`✅ Loaded ${filteredFaceDescriptors.length} faces`);
                 return filteredFaceDescriptors.length;
             } catch (err) {
-                console.error('Error loading faces:', err);
+                debugLog(`❌ Error loading faces: ${err.message}`);
                 throw err;
             }
         }
@@ -389,17 +415,15 @@
                 return;
             }
 
-            // 🔑 Load faces only for selected section
             showStatus('info', 'Loading faces for selected section...');
+            debugLog(`Section changed to: ${selectedSection}`);
             
             try {
                 const faceCount = await loadFacesForSection(selectedSection);
                 
-                // Get section name
                 const section = sections.find(s => s.section_id === selectedSection);
                 const sectionName = section ? section.section_name : selectedSection;
 
-                // Update UI
                 document.getElementById('activeSectionName').textContent = sectionName;
                 document.getElementById('studentCount').textContent = faceCount;
                 document.getElementById('sectionInfo').style.display = 'block';
@@ -431,75 +455,65 @@
         }
 
         async function initCamera() {
-    document.getElementById('attendanceLoading').style.display = 'block';
-    document.getElementById('attendanceForm').style.display = 'none';
-    
-    try {
-        await loadModels();
-        await loadSections();
-        
-        video = document.getElementById('video');
-        canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { width: 640, height: 480 } 
-        });
-        video.srcObject = stream;
-        
-        video.addEventListener('loadedmetadata', () => {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-
-            // Start a loop to draw mirrored video frames
-            function drawMirroredVideo() {
-                ctx.save();
-                ctx.scale(-1, 1); // flip horizontally
-                ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
-                ctx.restore();
-
-                requestAnimationFrame(drawMirroredVideo);
-            }
-            drawMirroredVideo();
-        });
-
-        document.getElementById('attendanceLoading').style.display = 'none';
-        document.getElementById('attendanceForm').style.display = 'block';
-    } catch (err) {
-        document.getElementById('attendanceLoading').style.display = 'none';
-        showStatus('error', 'Error: ' + err.message);
-    }
-}
-
-
-        // async function initCamera() {
-        //     document.getElementById('attendanceLoading').style.display = 'block';
-        //     document.getElementById('attendanceForm').style.display = 'none';
+            document.getElementById('attendanceLoading').style.display = 'block';
+            document.getElementById('attendanceForm').style.display = 'none';
             
-        //     try {
-        //         await loadModels();
-        //         await loadSections();
+            try {
+                await loadModels();
+                await loadSections();
                 
-        //         video = document.getElementById('video');
-        //         canvas = document.getElementById('canvas');
+                video = document.getElementById('video');
+                canvas = document.getElementById('canvas');
+                const ctx = canvas.getContext('2d');
 
-        //         const stream = await navigator.mediaDevices.getUserMedia({ 
-        //             video: { width: 640, height: 480 } 
-        //         });
-        //         video.srcObject = stream;
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: 'user'
+                    } 
+                });
+                video.srcObject = stream;
                 
-        //         video.addEventListener('loadedmetadata', () => {
-        //             canvas.width = video.videoWidth;
-        //             canvas.height = video.videoHeight;
-        //         });
+                video.addEventListener('loadeddata', () => {
+                    debugLog(`Video dimensions: ${video.videoWidth}x${video.videoHeight}`);
+                    
+                    // Set canvas dimensions to match video
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    
+                    // Test canvas drawing
+                    // testCanvasDrawing();
+                    
+                    document.getElementById('attendanceLoading').style.display = 'none';
+                    document.getElementById('attendanceForm').style.display = 'block';
+                    showStatus('success', 'Camera initialized successfully');
+                });
 
-        //         document.getElementById('attendanceLoading').style.display = 'none';
-        //         document.getElementById('attendanceForm').style.display = 'block';
-        //     } catch (err) {
-        //         document.getElementById('attendanceLoading').style.display = 'none';
-        //         showStatus('error', 'Error: ' + err.message);
-        //     }
-        // }
+            } catch (err) {
+                document.getElementById('attendanceLoading').style.display = 'none';
+                debugLog(`❌ Camera initialization error: ${err.message}`);
+                showStatus('error', 'Error: ' + err.message);
+            }
+        }
+
+        function testCanvasDrawing() {
+            const ctx = canvas.getContext('2d');
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw a test rectangle
+            ctx.fillStyle = 'red';
+            ctx.fillRect(50, 50, 100, 50);
+            
+            // Draw test text
+            ctx.fillStyle = 'white';
+            ctx.font = '20px Arial';
+            // ctx.fillText('Canvas Test', 60, 85);
+            
+            // debugLog('Canvas test drawing complete');
+        }
 
         async function startAttendance() {
             if (!selectedSection) {
@@ -515,136 +529,135 @@
             isAttendanceRunning = true;
             const mode = timeMode === 1 ? 'Time In' : 'Time Out';
             showStatus('info', `👀 Looking for faces... Mode: ${mode}`);
-            recognizeFaces();
+            debugLog('Starting face recognition...');
+            
+            // Clear any existing interval
+            if (recognitionInterval) {
+                clearInterval(recognitionInterval);
+            }
+            
+            // Start recognition loop
+            recognitionInterval = setInterval(recognizeFaces, 100); // Process every 100ms
         }
 
         function stopAttendance() {
             isAttendanceRunning = false;
+            if (recognitionInterval) {
+                clearInterval(recognitionInterval);
+                recognitionInterval = null;
+            }
+            
+            // Clear canvas
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
             showStatus('info', 'Recognition stopped');
+            debugLog('Recognition stopped');
         }
 
         async function recognizeFaces() {
-    if (!isAttendanceRunning) return;
-
-    const detections = await faceapi.detectAllFaces(video)
-        .withFaceLandmarks()
-        .withFaceDescriptors();
-
+    if (!isAttendanceRunning || !modelsLoaded) return;
+    
     const ctx = canvas.getContext('2d');
+    
+    try {
+        // Clear previous drawings
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        const detections = await faceapi.detectAllFaces(video)
+            .withFaceLandmarks()
+            .withFaceDescriptors();
+        
+        debugLog(`Detected ${detections.length} face(s)`);
+        
+        if (detections.length > 0) {
+            // Resize detections to match canvas size
+            const resizedDetections = faceapi.resizeResults(detections, {
+                width: canvas.width,
+                height: canvas.height
+            });
 
-    // Flip the canvas horizontally before drawing
-    ctx.setTransform(-1, 0, 0, 1, canvas.width, 0); 
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            for (let i = 0; i < resizedDetections.length; i++) {
+                const detection = resizedDetections[i];
+                let bestMatch = null;
+                let bestDistance = Infinity;
 
-    // Reset transform so boxes/text are not flipped
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+                // Find the best match
+                for (const registered of filteredFaceDescriptors) {
+                    const distance = faceapi.euclideanDistance(detection.descriptor, registered.descriptor);
+                    if (distance < bestDistance && distance < MATCH_THRESHOLD) {
+                        bestDistance = distance;
+                        bestMatch = registered;
+                    }
+                }
 
-    if (detections.length > 0) {
-        const resizedDetections = faceapi.resizeResults(detections, {
-            width: canvas.width,
-            height: canvas.height
-        });
+                const box = detection.detection.box;
+                
+                // MIRROR THE X COORDINATE
+                // Since video is mirrored with CSS, we need to mirror the x coordinate
+                const mirroredX = canvas.width - box.x - box.width;
+                
+                debugLog(`Face ${i}: orig x=${box.x.toFixed(0)}, mirrored x=${mirroredX.toFixed(0)}, y=${box.y.toFixed(0)}, w=${box.width.toFixed(0)}, h=${box.height.toFixed(0)}`);
+                
+                // Draw face bounding box with mirrored X coordinate
+                ctx.strokeStyle = bestMatch ? '#00ff00' : '#ff0000';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(mirroredX, box.y, box.width, box.height);
 
-        for (const detection of resizedDetections) {
-            let bestMatch = null;
-            let bestDistance = Infinity;
-
-            for (const registered of filteredFaceDescriptors) {
-                const distance = faceapi.euclideanDistance(detection.descriptor, registered.descriptor);
-                if (distance < bestDistance && distance < MATCH_THRESHOLD) {
-                    bestDistance = distance;
-                    bestMatch = registered;
+                if (bestMatch) {
+                    // Draw name background
+                    const name = bestMatch.name;
+                    ctx.fillStyle = '#00ff00';
+                    ctx.fillRect(mirroredX, box.y - 30, box.width, 30);
+                    
+                    // Draw name text
+                    ctx.fillStyle = '#000000';
+                    ctx.font = 'bold 16px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(name, mirroredX + 5, box.y - 15);
+                    
+                    // Draw confidence
+                    const confidence = ((1 - bestDistance) * 100).toFixed(1);
+                    ctx.font = '12px Arial';
+                    ctx.fillText(`${confidence}%`, mirroredX + box.width - 45, box.y - 15);
+                    
+                    debugLog(`Matched: ${name} (confidence: ${confidence}%)`);
+                    
+                    // Mark attendance
+                    await markAttendance(bestMatch.student_id);
+                } else {
+                    // Draw unknown face indicator
+                    ctx.fillStyle = '#ff0000';
+                    ctx.fillRect(mirroredX, box.y - 30, box.width, 30);
+                    
+                    // Draw unknown text
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('Not in Section', mirroredX + 5, box.y - 15);
+                    
+                    debugLog('No match found for this face');
                 }
             }
-
-            const box = detection.detection.box;
-            ctx.strokeStyle = bestMatch ? '#00ff00' : '#ff0000';
-            ctx.lineWidth = 3;
-            ctx.strokeRect(box.x, box.y, box.width, box.height);
-
-            if (bestMatch) {
-                ctx.fillStyle = '#00ff00';
-                ctx.fillRect(box.x, box.y - 30, box.width, 30);
-                ctx.fillStyle = '#000';
-                ctx.font = '16px Arial';
-                ctx.fillText(bestMatch.name, box.x + 5, box.y - 10);
-                await markAttendance(bestMatch.student_id);
-            } else {
-                ctx.fillStyle = '#ff0000';
-                ctx.fillRect(box.x, box.y - 30, box.width, 30);
-                ctx.fillStyle = '#fff';
-                ctx.font = '16px Arial';
-                ctx.fillText('Not in Section', box.x + 5, box.y - 10);
-            }
         }
+    } catch (error) {
+        debugLog(`Recognition error: ${error.message}`);
     }
-
-    requestAnimationFrame(recognizeFaces);
 }
-
-
-        // async function recognizeFaces() {
-        //     if (!isAttendanceRunning) return;
-
-        //     const detections = await faceapi.detectAllFaces(video)
-        //         .withFaceLandmarks()
-        //         .withFaceDescriptors();
-
-        //     const ctx = canvas.getContext('2d');
-        //     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        //     if (detections.length > 0) {
-        //         const resizedDetections = faceapi.resizeResults(detections, {
-        //             width: canvas.width,
-        //             height: canvas.height
-        //         });
-
-        //         for (const detection of resizedDetections) {
-        //             let bestMatch = null;
-        //             let bestDistance = Infinity;
-
-        //             // 🔑 Compare only with filtered descriptors (section-specific)
-        //             for (const registered of filteredFaceDescriptors) {
-        //                 const distance = faceapi.euclideanDistance(detection.descriptor, registered.descriptor);
-        //                 if (distance < bestDistance && distance < MATCH_THRESHOLD) {
-        //                     bestDistance = distance;
-        //                     bestMatch = registered;
-        //                 }
-        //             }
-
-        //             const box = detection.detection.box;
-        //             ctx.strokeStyle = bestMatch ? '#00ff00' : '#ff0000';
-        //             ctx.lineWidth = 3;
-        //             ctx.strokeRect(box.x, box.y, box.width, box.height);
-
-        //             if (bestMatch) {
-        //                 ctx.fillStyle = '#00ff00';
-        //                 ctx.fillRect(box.x, box.y - 30, box.width, 30);
-        //                 ctx.fillStyle = '#000';
-        //                 ctx.font = '16px Arial';
-        //                 ctx.fillText(bestMatch.name, box.x + 5, box.y - 10);
-        //                 await markAttendance(bestMatch.student_id);
-        //             } else {
-        //                 ctx.fillStyle = '#ff0000';
-        //                 ctx.fillRect(box.x, box.y - 30, box.width, 30);
-        //                 ctx.fillStyle = '#fff';
-        //                 ctx.font = '16px Arial';
-        //                 ctx.fillText('Not in Section', box.x + 5, box.y - 10);
-        //             }
-        //         }
-        //     }
-
-        //     requestAnimationFrame(recognizeFaces);
-        // }
 
         let lastMarked = {};
         
         async function markAttendance(studentId) {
             const now = Date.now();
             const key = `${studentId}_${timeMode}`;
-            if (lastMarked[key] && now - lastMarked[key] < 10000) return;
+            
+            // Prevent multiple marks within 10 seconds
+            if (lastMarked[key] && now - lastMarked[key] < 10000) {
+                debugLog(`Skipping duplicate mark for ${studentId}`);
+                return;
+            }
             
             try {
                 const formData = new FormData();
@@ -662,11 +675,13 @@
                     const mode = timeMode === 1 ? 'Time In' : 'Time Out';
                     showStatus('success', `✅ ${mode} marked for ${student.name}`);
                     lastMarked[key] = now;
+                    debugLog(`Attendance marked: ${mode} for ${student.name}`);
                 } else {
                     showStatus('error', result.message);
+                    debugLog(`Attendance error: ${result.message}`);
                 }
             } catch (err) {
-                console.error('Attendance error:', err);
+                debugLog(`Network error: ${err.message}`);
             }
         }
 
@@ -675,10 +690,21 @@
             element.className = `status ${type}`;
             element.textContent = message;
             element.style.display = 'block';
+            debugLog(`Status: ${message}`);
         }
 
+        // Initialize when page loads
         window.addEventListener('DOMContentLoaded', () => {
-            setTimeout(() => initCamera(), 500);
+            debugLog('Page loaded, initializing...');
+            initCamera();
+        });
+        
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            stopAttendance();
+            if (video && video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
+            }
         });
     </script>
 </body>
