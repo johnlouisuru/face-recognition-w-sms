@@ -356,18 +356,25 @@
                         </select>
                     </div>
                     <div class="filter-group">
-                        <label>Status:</label>
-                        <select id="statusFilter">
-                            <option value="">All Status</option>
-                            <option value="complete">Complete (In & Out)</option>
-                            <option value="incomplete">Incomplete</option>
-                        </select>
-                    </div>
-                    <div style="display: flex; gap: 10px; align-items: end;">
+    <label>Status:</label>
+    <select id="statusFilter">
+        <option value="">All Status</option>
+        <option value="complete">Complete (In & Out)</option>
+        <option value="present">Present (Has Time In)</option>
+        <option value="absent">Absent</option>
+    </select>
+</div>
+                    <!-- <div style="display: flex; gap: 10px; align-items: end;">
                         <button class="btn btn-primary" onclick="applyFilters()">🔍 Filter</button>
                         <button class="btn btn-success" onclick="exportReport()">📥 Export</button>
                         <button class="btn" onclick="manualRefresh()" title="Refresh Now">🔄 Now</button>
-                    </div>
+                    </div> -->
+                    <div style="display: flex; gap: 10px; align-items: end;">
+    <button class="btn btn-primary" onclick="applyFilters()">🔍 Filter</button>
+    <button class="btn btn-success" onclick="exportReport()">📥 Export</button>
+    <button class="btn" onclick="resetFilters()" title="Reset Filters">🔄 Reset</button>
+    <button class="btn" onclick="manualRefresh()" title="Refresh Now">🔄 Now</button>
+</div>
                 </div>
             </div>
 
@@ -442,58 +449,67 @@
         }
 
         async function loadData() {
-            if (isRefreshing) return;
-            
-            isRefreshing = true;
-            showRefreshingState(true);
-            
-            try {
-                // Load sections first
-                const sectionsResponse = await fetch('get_sections.php');
-                allSections = await sectionsResponse.json();
-                
-                // Populate section filter
-                const sectionFilter = document.getElementById('sectionFilter');
-                sectionFilter.innerHTML = '<option value="">All Sections</option>';
-                allSections.forEach(section => {
-                    sectionFilter.innerHTML += `<option value="${section.section_id}">${section.section_name}</option>`;
-                });
-                
-                // Load students
-                const studentsResponse = await fetch('get_students.php');
-                allStudents = await studentsResponse.json();
-                
-                // Populate student filter with all students initially
-                populateStudentFilter(allStudents);
-
-                // Load attendance
-                await loadAttendance();
-                
-                // Update last updated time
-                updateLastUpdatedTime();
-                
-            } catch (error) {
-                console.error('Error loading data:', error);
-                showRefreshingState(false);
-                isRefreshing = false;
-            }
+    if (isRefreshing) return;
+    
+    isRefreshing = true;
+    showRefreshingState(true);
+    
+    try {
+        // Load sections first
+        const sectionsResponse = await fetch('get_sections.php');
+        allSections = await sectionsResponse.json() || [];
+        
+        console.log('Loaded sections:', allSections);
+        
+        // Populate section filter
+        const sectionFilter = document.getElementById('sectionFilter');
+        sectionFilter.innerHTML = '<option value="">All Sections</option>';
+        allSections.forEach(section => {
+            sectionFilter.innerHTML += `<option value="${section.section_id}">${section.section_name}</option>`;
+        });
+        
+        // Load students with error handling
+        try {
+            const studentsResponse = await fetch('get_students.php');
+            allStudents = await studentsResponse.json() || [];
+            console.log('Loaded students:', allStudents.length);
+        } catch (error) {
+            console.error('Error loading students:', error);
+            allStudents = [];
         }
+        
+        // Load attendance
+        await loadAttendance();
+        
+        // Apply filters only after everything is loaded
+        applyFilters();
+        
+        // Update last updated time
+        updateLastUpdatedTime();
+        
+    } catch (error) {
+        console.error('Error loading data:', error);
+        showRefreshingState(false);
+        isRefreshing = false;
+    }
+}
 
         async function loadAttendance() {
-            try {
-                const response = await fetch('get_all_attendance.php');
-                allAttendance = await response.json();
-                
-                updateStatistics();
-                applyFilters();
-                
-            } catch (error) {
-                console.error('Error loading attendance:', error);
-            } finally {
-                showRefreshingState(false);
-                isRefreshing = false;
-            }
-        }
+    try {
+        const response = await fetch('get_all_attendance.php');
+        allAttendance = await response.json();
+        
+        updateStatistics();
+        // Don't call applyFilters() here yet
+        // Wait for everything to be loaded first
+        
+    } catch (error) {
+        console.error('Error loading attendance:', error);
+    } finally {
+        showRefreshingState(false);
+        isRefreshing = false;
+    }
+}
 
         function updateStatistics() {
             const today = new Date().toISOString().split('T')[0];
@@ -516,221 +532,293 @@
         }
 
         function applyFilters() {
-            const startDate = document.getElementById('startDate').value;
-            const endDate = document.getElementById('endDate').value;
-            const sectionId = document.getElementById('sectionFilter').value;
-            const studentId = document.getElementById('studentFilter').value;
-            const status = document.getElementById('statusFilter').value;
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    const sectionId = document.getElementById('sectionFilter').value;
+    const studentId = document.getElementById('studentFilter').value;
+    const status = document.getElementById('statusFilter').value;
 
-            let filtered = allAttendance.filter(record => {
-                const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
-                
-                // Date filter
-                if (startDate && recordDate < startDate) return false;
-                if (endDate && recordDate > endDate) return false;
-                
-                // Section filter
-                if (sectionId) {
-                    const student = allStudents.find(s => s.student_id === record.student_id);
-                    if (!student || student.section_id !== sectionId) return false;
-                }
-                
-                // Student filter
-                if (studentId && record.student_id !== studentId) return false;
-                
-                // Status filter
-                if (status === 'complete' && (!record.time_in || !record.time_out)) return false;
-                if (status === 'incomplete' && record.time_in && record.time_out) return false;
-                
-                return true;
-            });
-
-            displayTodayAttendance(filtered);
-            displayHistory(filtered);
-            displayStudentReport(filtered);
-            displaySummary(filtered);
+    let filtered = allAttendance.filter(record => {
+        const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+        
+        // Date filter
+        if (startDate && recordDate < startDate) return false;
+        if (endDate && recordDate > endDate) return false;
+        
+        // Section filter - FIXED: Use record.section_id instead of looking up student
+        if (sectionId) {
+            if (!record.section_id || String(record.section_id) !== String(sectionId)) return false;
         }
+        
+        // Student filter
+        if (studentId && record.student_id !== studentId) return false;
+        
+        // Status filter - FIXED: Added absent logic
+if (status === 'complete' && (!record.time_in || !record.time_out)) return false;
+if (status === 'present' && (!record.time_in)) return false;
+if (status === 'absent' && record.time_in) return false;
+        
+        return true;
+    });
 
-        function displayTodayAttendance(data) {
-            const today = new Date().toISOString().split('T')[0];
-            const todayData = data.filter(record => {
-                const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
-                return recordDate === today;
-            });
+    displayTodayAttendance(filtered);
+    displayHistory(filtered);
+    displayStudentReport(filtered);
+    displaySummary(filtered);
+}
 
-            // Get current filter selections
-            const sectionId = document.getElementById('sectionFilter').value;
-            const studentId = document.getElementById('studentFilter').value;
+    function displayTodayAttendance(data) {
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Filter only today's records
+    const todayData = data.filter(record => {
+        const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+        return recordDate === today;
+    });
+    
+    console.log('Today\'s data:', todayData);
 
-            // Filter students based on current filters
-            let studentsToShow = allStudents;
+    // Get current filter selections
+    const sectionId = document.getElementById('sectionFilter').value;
+    const studentId = document.getElementById('studentFilter').value;
+    const statusFilter = document.getElementById('statusFilter').value;
+
+    let html = '';
+    
+    if (todayData.length === 0) {
+        html = `<div class="empty-state">
+            <div class="empty-state-icon">📭</div>
+            <p>No attendance records for today</p>
+        </div>`;
+    } else {
+        html = `<table class="attendance-table">
+            <thead>
+                <tr>
+                    <th>Student ID</th>
+                    <th>Name</th>
+                    <th>Grade</th>
+                    <th>Section</th>
+                    <th>Time In 📲</th>
+                    <th>Time Out 📲</th>
+                    <th>Duration</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>`;
+        
+        // Apply additional filters to today's data
+        let filteredTodayData = todayData.filter(record => {
+            // Section filter
             if (sectionId) {
-                studentsToShow = studentsToShow.filter(s => s.section_id === sectionId);
-            }
-            if (studentId) {
-                studentsToShow = studentsToShow.filter(s => s.student_id === studentId);
-            }
-
-            let html = '';
-            if (studentsToShow.length === 0) {
-                html = `<div class="empty-state">
-                    <div class="empty-state-icon">📭</div>
-                    <p>No students found</p>
-                </div>`;
-            } else {
-                html = `<table class="attendance-table">
-                    <thead>
-                        <tr>
-                            <th>Student ID</th>
-                            <th>Name</th>
-                            <th>Grade</th>
-                            <th>Section</th>
-                            <th>Time In 📲</th>
-                            <th>Time Out 📲</th>
-                            <th>Duration</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>`;
-                
-                // Display all students (present and absent)
-                studentsToShow.forEach(student => {
-                    // Find if student has attendance record for today
-                    const record = todayData.find(r => r.student_id === student.student_id);
-                    
-                    if (record) {
-                        // Student has attendance record
-                        const timeIn = record.time_in ? new Date(record.time_in).toLocaleTimeString() : '-';
-                        const timeOut = record.time_out ? new Date(record.time_out).toLocaleTimeString() : '-';
-                        const duration = calculateDuration(record.time_in, record.time_out);
-                        const status = getStatus(record);
-                        
-                        html += `<tr>
-                            <td>${student.student_id}</td>
-                            <td>${student.student_name}</td>
-                            <td>${student.grade}</td>
-                            <td>${student.section_name || 'N/A'}</td>
-                            <td>${timeIn}</td>
-                            <td>${timeOut}</td>
-                            <td class="duration">${duration}</td>
-                            <td><span class="status-badge ${status.class}">${status.text}</span></td>
-                        </tr>`;
-                    } else {
-                        // Student is absent (no attendance record)
-                        html += `<tr>
-                            <td>${student.student_id}</td>
-                            <td>${student.student_name}</td>
-                            <td>${student.grade}</td>
-                            <td>${student.section_name || 'N/A'}</td>
-                            <td>-</td>
-                            <td>-</td>
-                            <td>-</td>
-                            <td><span class="status-badge status-absent">Absent</span></td>
-                        </tr>`;
-                    }
-                });
-                
-                html += `</tbody></table>`;
+                const recordSectionId = record.section_id || record.section_name;
+                if (!recordSectionId || String(recordSectionId) !== String(sectionId)) {
+                    return false;
+                }
             }
             
-            document.getElementById('todayContent').innerHTML = html;
+            // Student filter
+            if (studentId && record.student_id !== studentId) return false;
+            
+            // Status filter
+            if (statusFilter === 'complete' && (!record.time_in || !record.time_out)) return false;
+            if (statusFilter === 'present' && (!record.time_in)) return false;
+            if (statusFilter === 'absent' && record.time_in) return false;
+            
+            return true;
+        });
+        
+        console.log('Filtered today\'s data:', filteredTodayData);
+        
+        // Show only the filtered today's attendance records
+        filteredTodayData.forEach(record => {
+            const timeIn = record.time_in ? new Date(record.time_in).toLocaleTimeString() : '-';
+            const timeOut = record.time_out ? new Date(record.time_out).toLocaleTimeString() : '-';
+            const duration = calculateDuration(record.time_in, record.time_out);
+            const status = getStatus(record);
+            
+            html += `<tr>
+                <td>${record.student_id}</td>
+                <td>${record.student_name}</td>
+                <td>${record.student_grade || 'N/A'}</td>
+                <td>${record.section_name || 'N/A'}</td>
+                <td>${timeIn}</td>
+                <td>${timeOut}</td>
+                <td class="duration">${duration}</td>
+                <td><span class="status-badge ${status.class}">${status.text}</span></td>
+            </tr>`;
+        });
+        
+        // If no records after filtering but we have the "absent" filter
+        if (filteredTodayData.length === 0 && statusFilter === 'absent') {
+            html += `<tr><td colspan="8" style="text-align: center; padding: 20px; color: #666;">
+                No absent students found for today
+            </td></tr>`;
         }
+        
+        html += `</tbody></table>`;
+    }
+    
+    document.getElementById('todayContent').innerHTML = html;
+}
 
         let allSections = [];
 
         // Update loadData function - add section loading
         async function loadData() {
-            try {
-                // Load sections first
-                const sectionsResponse = await fetch('get_sections.php');
-                allSections = await sectionsResponse.json();
-                
-                // Populate section filter
-                const sectionFilter = document.getElementById('sectionFilter');
-                sectionFilter.innerHTML = '<option value="">All Sections</option>';
-                allSections.forEach(section => {
-                    sectionFilter.innerHTML += `<option value="${section.section_id}">${section.section_name}</option>`;
-                });
-                
-                // Load students
-                const studentsResponse = await fetch('get_students.php');
-                allStudents = await studentsResponse.json();
-                
-                // Populate student filter with all students initially
-                populateStudentFilter(allStudents);
+    if (isRefreshing) return;
+    
+    isRefreshing = true;
+    showRefreshingState(true);
+    
+    try {
+        // Load sections first
+        const sectionsResponse = await fetch('get_sections.php');
+        allSections = await sectionsResponse.json();
+        
+        // Populate section filter
+        const sectionFilter = document.getElementById('sectionFilter');
+        sectionFilter.innerHTML = '<option value="">All Sections</option>';
+        allSections.forEach(section => {
+            sectionFilter.innerHTML += `<option value="${section.section_id}">${section.section_name}</option>`;
+        });
+        
+        // Load students
+        const studentsResponse = await fetch('get_students.php');
+        allStudents = await studentsResponse.json();
+        
+        // Load attendance
+        await loadAttendance();
+        
+        // Apply filters only after everything is loaded
+        applyFilters();
+        
+        // Update last updated time
+        updateLastUpdatedTime();
+        
+    } catch (error) {
+        console.error('Error loading data:', error);
+        showRefreshingState(false);
+        isRefreshing = false;
+    }
+}
 
-                // Load attendance
-                await loadAttendance();
-                
-            } catch (error) {
-                console.error('Error loading data:', error);
-            }
-        }
-
-        // Add this new function
-        function populateStudentFilter(students) {
+       function populateStudentFilter(students) {
             const studentFilter = document.getElementById('studentFilter');
             studentFilter.innerHTML = '<option value="">All Students</option>';
-            students.forEach(student => {
-                studentFilter.innerHTML += `<option value="${student.student_id}">${student.student_name} (${student.student_id})</option>`;
-            });
+            
+            if (students && students.length > 0) {
+                students.forEach(student => {
+                    studentFilter.innerHTML += `<option value="${student.student_id}">${student.student_name} (${student.student_id})</option>`;
+                });
+            }
         }
 
         // Add this new function
-        function onSectionFilterChange() {
-            const selectedSection = document.getElementById('sectionFilter').value;
-            
-            if (!selectedSection) {
-                // Show all students if no section selected
-                populateStudentFilter(allStudents);
-            } else {
-                // Filter students by selected section
-                const filteredStudents = allStudents.filter(student => 
-                    student.section_id === selectedSection
-                );
-                populateStudentFilter(filteredStudents);
-            }
-            
-            // Reset student filter selection
-            document.getElementById('studentFilter').value = '';
+     function onSectionFilterChange() {
+    const selectedSection = document.getElementById('sectionFilter').value;
+    
+    // If no students loaded, populate from attendance records
+    if (allStudents.length === 0) {
+        // Extract unique students from attendance records
+        const uniqueStudentIds = [...new Set(allAttendance.map(r => r.student_id))];
+        const studentsFromAttendance = uniqueStudentIds.map(id => {
+            const record = allAttendance.find(a => a.student_id === id);
+            return {
+                student_id: id,
+                student_name: record?.student_name || 'Unknown',
+                section_id: record?.section_id,
+                section_name: record?.section_name
+            };
+        });
+        
+        if (!selectedSection) {
+            populateStudentFilter(studentsFromAttendance);
+        } else {
+            const filteredStudents = studentsFromAttendance.filter(student => 
+                String(student.section_id) === String(selectedSection) || 
+                student.section_name === selectedSection
+            );
+            populateStudentFilter(filteredStudents);
         }
+    } else {
+        // Original logic
+        if (!selectedSection) {
+            populateStudentFilter(allStudents);
+        } else {
+            const filteredStudents = allStudents.filter(student => 
+                String(student.section_id) === String(selectedSection) || 
+                student.section_name === selectedSection
+            );
+            populateStudentFilter(filteredStudents);
+        }
+    }
+    
+    // Reset student filter selection
+    document.getElementById('studentFilter').value = '';
+    
+    // Apply filters immediately when section changes
+    applyFilters();
+}
 
-        // Update applyFilters function - add section filtering
+function debugData() {
+    console.log('=== DEBUG DATA ===');
+    console.log('All Students:', allStudents);
+    console.log('First student section_id:', allStudents[0]?.section_id);
+    console.log('First student section_name:', allStudents[0]?.section_name);
+    
+    console.log('All Attendance:', allAttendance);
+    console.log('First attendance record section_id:', allAttendance[0]?.section_id);
+    
+    console.log('All Sections:', allSections);
+    console.log('=== END DEBUG ===');
+}
+
+// Call this after loading data
+// In loadData(), after everything is loaded:
+debugData();
+
         function applyFilters() {
-            const startDate = document.getElementById('startDate').value;
-            const endDate = document.getElementById('endDate').value;
-            const sectionId = document.getElementById('sectionFilter').value;
-            const studentId = document.getElementById('studentFilter').value;
-            const status = document.getElementById('statusFilter').value;
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    const sectionId = document.getElementById('sectionFilter').value;
+    const studentId = document.getElementById('studentFilter').value;
+    const status = document.getElementById('statusFilter').value;
 
-            let filtered = allAttendance.filter(record => {
-                const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
-                
-                // Date filter
-                if (startDate && recordDate < startDate) return false;
-                if (endDate && recordDate > endDate) return false;
-                
-                // Section filter
-                if (sectionId) {
-                    const student = allStudents.find(s => s.student_id === record.student_id);
-                    if (!student || student.section_id !== sectionId) return false;
-                }
-                
-                // Student filter
-                if (studentId && record.student_id !== studentId) return false;
-                
-                // Status filter
-                if (status === 'complete' && (!record.time_in || !record.time_out)) return false;
-                if (status === 'incomplete' && record.time_in && record.time_out) return false;
-                
-                return true;
-            });
+    console.log('Applying filters:', { startDate, endDate, sectionId, studentId, status });
 
-            displayTodayAttendance(filtered);
-            displayHistory(filtered);
-            displayStudentReport(filtered);
-            displaySummary(filtered);
+    let filtered = allAttendance.filter(record => {
+        const recordDate = new Date(record.timestamp).toISOString().split('T')[0];
+        
+        // Date filter
+        if (startDate && recordDate < startDate) return false;
+        if (endDate && recordDate > endDate) return false;
+        
+        // Section filter - check both section_id formats
+        if (sectionId) {
+            const recordSectionId = record.section_id || record.section_name;
+            if (!recordSectionId || String(recordSectionId) !== String(sectionId)) {
+                console.log('Filtered out by section:', record.student_id, 'section:', recordSectionId);
+                return false;
+            }
         }
+        
+        // Student filter
+        if (studentId && record.student_id !== studentId) return false;
+        
+        // Status filter
+        if (status === 'complete' && (!record.time_in || !record.time_out)) return false;
+        if (status === 'present' && (!record.time_in)) return false;
+        if (status === 'absent' && record.time_in) return false;
+        
+        return true;
+    });
+
+    console.log('Filtered results:', filtered.length);
+    displayTodayAttendance(filtered);
+    displayHistory(filtered);
+    displayStudentReport(filtered);
+    displaySummary(filtered);
+}
 
         function displayHistory(data) {
             let html = '';
@@ -780,6 +868,26 @@
             document.getElementById('historyContent').innerHTML = html;
         }
 
+        function getStudentInfoFromAttendance(studentId) {
+    // Try to find student in allStudents first
+    const student = allStudents.find(s => s.student_id === studentId);
+    if (student) return student;
+    
+    // Fallback: find in attendance records
+    const attendanceRecord = allAttendance.find(a => a.student_id === studentId);
+    if (attendanceRecord) {
+        return {
+            student_id: attendanceRecord.student_id,
+            student_name: attendanceRecord.student_name,
+            grade: attendanceRecord.student_grade,
+            section_id: attendanceRecord.section_id,
+            section_name: attendanceRecord.section_name
+        };
+    }
+    
+    return null;
+}
+
         function displayStudentReport(data) {
             // Group by student
             const byStudent = {};
@@ -809,7 +917,7 @@
                             <th>Grade</th>
                             <th>Total Days</th>
                             <th>Complete Days</th>
-                            <th>Incomplete Days</th>
+                            <th>Present Days</th>
                             <th>Completion Rate</th>
                         </tr>
                     </thead>
@@ -862,7 +970,7 @@
                             <th>Date</th>
                             <th>Total Students Present</th>
                             <th>Complete Records</th>
-                            <th>Incomplete Records</th>
+                            <th>Present Records</th>
                             <th>Completion Rate</th>
                         </tr>
                     </thead>
@@ -925,6 +1033,26 @@
                 return { text: 'No Data', class: 'status-absent' };
             }
         }
+        // Debugging
+        function resetFilters() {
+    setDefaultDates();
+    document.getElementById('sectionFilter').value = '';
+    document.getElementById('studentFilter').value = '';
+    document.getElementById('statusFilter').value = '';
+    
+    // Reset student filter to show all students
+    populateStudentFilter(allStudents);
+    
+    applyFilters();
+}
+
+function debugFilters() {
+    console.log('All Students:', allStudents.length);
+    console.log('All Attendance:', allAttendance.length);
+    console.log('All Sections:', allSections.length);
+    console.log('Current Section Filter:', document.getElementById('sectionFilter').value);
+    console.log('Current Student Filter:', document.getElementById('studentFilter').value);
+}
 
         function switchTab(tabName) {
             document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
