@@ -235,6 +235,11 @@
             max-height: 100px;
             overflow-y: auto;
         }
+        .status.warning {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
     </style>
 </head>
 <body>
@@ -318,14 +323,20 @@
     <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
     <script>
         let video, canvas;
-        let isAttendanceRunning = false;
-        let filteredFaceDescriptors = [];
-        let modelsLoaded = false;
-        let selectedSection = '';
-        let timeMode = 1;
-        let sections = [];
-        const MATCH_THRESHOLD = 0.6;
-        let recognitionInterval = null;
+let isAttendanceRunning = false;
+let filteredFaceDescriptors = [];
+let modelsLoaded = false;
+let selectedSection = '';
+let timeMode = 1;
+let sections = [];
+const MATCH_THRESHOLD = 0.6;
+let recognitionInterval = null;
+
+// ADD THESE GLOBAL VARIABLES:
+let faceMatchCache = new Map();
+let lastMarked = {};
+let pendingMarks = new Set();
+const CACHE_DURATION = 1000;
         
         // Debug logging
         function debugLog(message) {
@@ -516,49 +527,55 @@
         }
 
         async function startAttendance() {
-            if (!selectedSection) {
-                showStatus('error', 'Please select a section first!');
-                return;
-            }
-            
-            if (filteredFaceDescriptors.length === 0) {
-                showStatus('error', 'No students in selected section!');
-                return;
-            }
-            
-            isAttendanceRunning = true;
-            const mode = timeMode === 1 ? 'Time In' : 'Time Out';
-            showStatus('info', `👀 Looking for faces... Mode: ${mode}`);
-            debugLog('Starting face recognition...');
-            
-            // Clear any existing interval
-            if (recognitionInterval) {
-                clearInterval(recognitionInterval);
-            }
-            
-            // Start recognition loop
-            recognitionInterval = setInterval(recognizeFaces, 100); // Process every 100ms
+    if (!selectedSection) {
+        showStatus('error', 'Please select a section first!');
+        return;
+    }
+    
+    if (filteredFaceDescriptors.length === 0) {
+        showStatus('error', 'No students in selected section!');
+        return;
+    }
+    
+    isAttendanceRunning = true;
+    const mode = timeMode === 1 ? 'Time In' : 'Time Out';
+    showStatus('info', `👀 Looking for faces... Mode: ${mode}`);
+    debugLog('Starting face recognition...');
+    
+    // Clear any existing interval
+    if (recognitionInterval) {
+        clearInterval(recognitionInterval);
+    }
+    
+    // Use requestAnimationFrame for smoother rendering
+    function recognitionLoop() {
+        if (isAttendanceRunning) {
+            recognizeFaces().finally(() => {
+                // Use setTimeout instead of setInterval for better control
+                setTimeout(recognitionLoop, 100); // 10 FPS
+            });
         }
+    }
+    
+    recognitionLoop();
+}
 
         function stopAttendance() {
-            isAttendanceRunning = false;
-            if (recognitionInterval) {
-                clearInterval(recognitionInterval);
-                recognitionInterval = null;
-            }
-            
-            // Clear canvas
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            showStatus('info', 'Recognition stopped');
-            debugLog('Recognition stopped');
-        }
+    isAttendanceRunning = false;
+    
+    // Clear canvas
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    showStatus('info', 'Recognition stopped');
+    debugLog('Recognition stopped');
+}
 
-        async function recognizeFaces() {
+async function recognizeFaces() {
     if (!isAttendanceRunning || !modelsLoaded) return;
     
     const ctx = canvas.getContext('2d');
+    const now = Date.now(); // Define 'now' here
     
     try {
         // Clear previous drawings
@@ -594,7 +611,6 @@
                 const box = detection.detection.box;
                 
                 // MIRROR THE X COORDINATE
-                // Since video is mirrored with CSS, we need to mirror the x coordinate
                 const mirroredX = canvas.width - box.x - box.width;
                 
                 debugLog(`Face ${i}: orig x=${box.x.toFixed(0)}, mirrored x=${mirroredX.toFixed(0)}, y=${box.y.toFixed(0)}, w=${box.width.toFixed(0)}, h=${box.height.toFixed(0)}`);
@@ -605,28 +621,66 @@
                 ctx.strokeRect(mirroredX, box.y, box.width, box.height);
 
                 if (bestMatch) {
-                    // Draw name background
-                    const name = bestMatch.name;
-                    ctx.fillStyle = '#00ff00';
-                    ctx.fillRect(mirroredX, box.y - 30, box.width, 30);
-                    
-                    // Draw name text
-                    ctx.fillStyle = '#000000';
-                    ctx.font = 'bold 16px Arial';
-                    ctx.textAlign = 'left';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(name, mirroredX + 5, box.y - 15);
-                    
-                    // Draw confidence
-                    const confidence = ((1 - bestDistance) * 100).toFixed(1);
-                    ctx.font = '12px Arial';
-                    ctx.fillText(`${confidence}%`, mirroredX + box.width - 45, box.y - 15);
-                    
-                    debugLog(`Matched: ${name} (confidence: ${confidence}%)`);
-                    
-                    // Mark attendance
-                    await markAttendance(bestMatch.student_id);
-                } else {
+    // Draw name background - IMMEDIATELY
+    const name = bestMatch.name;
+    ctx.fillStyle = '#00ff00';
+    ctx.fillRect(mirroredX, box.y - 30, box.width, 30);
+    
+    // Draw name text - IMMEDIATELY
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(name, mirroredX + 5, box.y - 15);
+    
+    // Draw confidence
+    const confidence = ((1 - bestDistance) * 100).toFixed(1);
+    ctx.font = '12px Arial';
+    ctx.fillText(`${confidence}%`, mirroredX + box.width - 45, box.y - 15);
+    
+    // Check cache for recent matches
+    const cacheKey = `${bestMatch.student_id}_${timeMode}`;
+    const cachedResult = faceMatchCache.get(cacheKey);
+    
+    // Draw "Marking..." indicator if pending
+    const isMarking = pendingMarks.has(cacheKey);
+    if (isMarking) {
+        ctx.fillStyle = '#ffff00';
+        ctx.font = 'bold 12px Arial';
+        ctx.fillText('Marking...', mirroredX + box.width - 100, box.y - 15);
+    } else if (cachedResult && now - cachedResult.timestamp <= CACHE_DURATION) {
+        // Show "Already Marked" indicator if recently cached
+        ctx.fillStyle = '#ff9900';
+        ctx.font = 'bold 12px Arial';
+        ctx.fillText('Already Marked', mirroredX + box.width - 100, box.y - 15);
+    }
+    
+    // Show appropriate status message
+    const mode = timeMode === 1 ? 'Time In' : 'Time Out';
+    if (cachedResult && now - cachedResult.timestamp <= CACHE_DURATION) {
+        // Don't show detection message for recently cached faces
+        // The status will show from the markAttendance() function
+    } else {
+        showStatus('info', `👤 Detected: ${name} (${confidence}%)`);
+    }
+    
+    // Cache and mark attendance if not recently processed
+    if (!cachedResult || now - cachedResult.timestamp > CACHE_DURATION) {
+        // Cache the match
+        faceMatchCache.set(cacheKey, {
+            timestamp: now,
+            match: bestMatch,
+            distance: bestDistance
+        });
+        
+        // Mark attendance in background (don't wait for it)
+        markAttendance(bestMatch.student_id).catch(err => {
+            debugLog(`Background mark error: ${err.message}`);
+        });
+    } else {
+        debugLog(`Skipping recently cached match for ${name}`);
+    }
+} else {
                     // Draw unknown face indicator
                     ctx.fillStyle = '#ff0000';
                     ctx.fillRect(mirroredX, box.y - 30, box.width, 30);
@@ -647,51 +701,116 @@
     }
 }
 
-        let lastMarked = {};
+
+
+async function markAttendance(studentId) {
+    const now = Date.now();
+    const key = `${studentId}_${timeMode}`;
+    
+    // Prevent multiple marks within 10 seconds
+    if (lastMarked[key] && now - lastMarked[key] < 10000) {
+        debugLog(`Skipping duplicate mark for ${studentId}`);
+        // Get student name for the message
+        const student = filteredFaceDescriptors.find(s => s.student_id === studentId);
+        if (student) {
+            showStatus('error', `Already marked ${timeMode === 1 ? 'present' : 'absent'} recently for ${student.name}`);
+        }
+        return;
+    }
+    
+    // Prevent multiple pending requests for same student
+    if (pendingMarks.has(key)) {
+        debugLog(`Already marking attendance for ${studentId}`);
+        return;
+    }
+    
+    try {
+        pendingMarks.add(key);
         
-        async function markAttendance(studentId) {
-            const now = Date.now();
-            const key = `${studentId}_${timeMode}`;
+        const formData = new FormData();
+        formData.append('student_id', studentId);
+        formData.append('time_in', timeMode);
+
+        const response = await fetch('mark_attendance.php', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            lastMarked[key] = now;
+            debugLog(`✅ Attendance marked: ${result.message || 'Success'}`);
             
-            // Prevent multiple marks within 10 seconds
-            if (lastMarked[key] && now - lastMarked[key] < 10000) {
-                debugLog(`Skipping duplicate mark for ${studentId}`);
-                return;
+            // Get student name for success message
+            const student = filteredFaceDescriptors.find(s => s.student_id === studentId);
+            if (student) {
+                const mode = timeMode === 1 ? 'Time In' : 'Time Out';
+                showStatus('success', `✅ ${mode} marked for ${student.name}`);
+
+                // Add this after drawing the name and confidence
+// Draw status indicator based on cache and pending status
+const cacheKey = `${bestMatch.student_id}_${timeMode}`;
+const cachedResult = faceMatchCache.get(cacheKey);
+const isMarking = pendingMarks.has(cacheKey);
+
+if (isMarking) {
+    // Show "Marking..." indicator
+    ctx.fillStyle = '#ffff00';
+    ctx.font = 'bold 12px Arial';
+    ctx.fillText('Marking...', mirroredX + box.width - 100, box.y - 15);
+} else if (cachedResult && now - cachedResult.timestamp <= CACHE_DURATION) {
+    // Show "Already Marked" indicator
+    ctx.fillStyle = '#ff9900';
+    ctx.font = 'bold 12px Arial';
+    ctx.fillText('Already Marked', mirroredX + box.width - 100, box.y - 15);
+    
+    // Also change the box color to orange
+    ctx.strokeStyle = '#ff9900';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(mirroredX, box.y, box.width, box.height);
+    
+    // Change the name background to orange too
+    ctx.fillStyle = '#ff9900';
+    ctx.fillRect(mirroredX, box.y - 30, box.width, 30);
+}
+
             }
+        } else {
+            debugLog(`❌ Attendance error: ${result.message}`);
             
-            try {
-                const formData = new FormData();
-                formData.append('student_id', studentId);
-                formData.append('time_in', timeMode);
-
-                const response = await fetch('mark_attendance.php', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const result = await response.json();
-                if (result.success) {
-                    const student = filteredFaceDescriptors.find(s => s.student_id === studentId);
-                    const mode = timeMode === 1 ? 'Time In' : 'Time Out';
-                    showStatus('success', `✅ ${mode} marked for ${student.name}`);
-                    lastMarked[key] = now;
-                    debugLog(`Attendance marked: ${mode} for ${student.name}`);
-                } else {
-                    showStatus('error', result.message);
-                    debugLog(`Attendance error: ${result.message}`);
-                }
-            } catch (err) {
-                debugLog(`Network error: ${err.message}`);
+            // Show the error message from backend (e.g., "Already marked present")
+            const student = filteredFaceDescriptors.find(s => s.student_id === studentId);
+            if (student) {
+                showStatus('warning', `⚠️ ${student.name}: ${result.message}`);
+            } else {
+                showStatus('error', `❌ ${result.message}`);
             }
         }
+    } catch (err) {
+        debugLog(`Network error: ${err.message}`);
+        showStatus('error', 'Network error marking attendance');
+    } finally {
+        pendingMarks.delete(key);
+    }
+}
 
         function showStatus(type, message) {
-            const element = document.getElementById('attendanceStatus');
-            element.className = `status ${type}`;
-            element.textContent = message;
-            element.style.display = 'block';
-            debugLog(`Status: ${message}`);
-        }
+    const element = document.getElementById('attendanceStatus');
+    element.className = `status ${type}`;
+    element.textContent = message;
+    element.style.display = 'block';
+    
+    // Auto-hide success messages after 3 seconds
+    if (type === 'success') {
+        setTimeout(() => {
+            if (element.textContent === message) {
+                element.style.display = 'none';
+            }
+        }, 3000);
+    }
+    
+    debugLog(`Status: ${message}`);
+}
 
         // Initialize when page loads
         window.addEventListener('DOMContentLoaded', () => {
