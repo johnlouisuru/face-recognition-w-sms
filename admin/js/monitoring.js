@@ -145,27 +145,20 @@ function updateAttendanceGrid(students) {
                 let timeOutBadge = '';
                 
                 if (student.time_in) {
-                    const timeIn = new Date(student.time_in);
-                    const isLate = timeIn.getHours() > 8 || (timeIn.getHours() === 8 && timeIn.getMinutes() > 0);
-                    
-                    if (isLate) {
-                        statusClass = 'status-late';
-                        statusText = 'Late';
-                    } else {
-                        statusClass = 'status-present';
-                        statusText = 'Present';
-                    }
+                    statusClass = 'status-present';
+                    statusText = 'Present';
                     
                     timeInBadge = `
                         <div class="time-badge mt-1">
                             <i class="bi bi-arrow-right-circle text-success"></i>
-                            IN: ${timeIn.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            IN: ${new Date(student.time_in).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                         </div>
                     `;
                 } else {
                     statusClass = 'status-absent';
                     statusText = 'Absent';
                 }
+
                 
                 if (student.time_out) {
                     const timeOut = new Date(student.time_out);
@@ -234,24 +227,33 @@ function updateRecentActivity(activities) {
         `;
     } else {
         activities.forEach(activity => {
-            const time = new Date(activity.timestamp);
-            const isLate = activity.status === 'Late';
-            const activityClass = isLate ? 'activity-late' : 'activity-present';
-            
-            html += `
-                <div class="activity-item ${activityClass}">
-                    <div class="d-flex justify-content-between">
-                        <strong>${activity.student_name}</strong>
-                        <small class="text-muted">${time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</small>
-                    </div>
-                    <div class="small">
-                        <span class="badge ${isLate ? 'bg-warning' : 'bg-success'}">${activity.status}</span>
-                        ${activity.time_out ? 'Time Out' : 'Time In'}
-                        <span class="badge bg-info">${activity.section_name}</span>
-                    </div>
-                </div>
-            `;
-        });
+    const time = new Date(activity.timestamp);
+    let displayStatus = activity.status;
+
+    // Force any "Late" to be treated as "Present"
+    if (displayStatus === 'Late') {
+        displayStatus = 'Present';
+    }
+
+    const activityClass = displayStatus === 'Present' ? 'activity-present' : 'activity-absent';
+
+    html += `
+        <div class="activity-item ${activityClass}">
+            <div class="d-flex justify-content-between">
+                <strong>${activity.student_name}</strong>
+                <small class="text-muted">${time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</small>
+            </div>
+            <div class="small">
+                <span class="badge ${displayStatus === 'Present' ? 'bg-success' : 'bg-danger'}">${displayStatus}</span>
+                ${activity.time_out ? 'Time Out' : 'Time In'}
+                <span class="badge bg-info">${activity.section_name}</span>
+            </div>
+        </div>
+    `;
+});
+
+
+
     }
     
     $('#recentActivity').html(html);
