@@ -240,6 +240,10 @@
     color: #856404;
     border: 1px solid #ffeaa7;
 }
+/* Hide the audio element */
+audio {
+    display: none;
+}
     </style>
 </head>
 <body>
@@ -319,6 +323,11 @@
             </div>
         </div>
     </div>
+        <!-- Hidden audio element for beep sound -->
+    <audio id="beepSound" preload="auto">
+        <source src="beep.mp3" type="audio/mpeg">
+        <source src="https://assets.mixkit.co/sfx/preview/mixkit-correct-answer-tone-2870.mp3" type="audio/mpeg">
+    </audio>
 
     <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
     <script>
@@ -337,6 +346,44 @@ let faceMatchCache = new Map();
 let lastMarked = {};
 let pendingMarks = new Set();
 const CACHE_DURATION = 1000;
+
+// Add these to your global variables section
+let recognizedFacesCache = new Map();
+const BEEP_CACHE_DURATION = 5000; // Don't beep for same face within 5 seconds
+let beepSound = null;
+
+// Initialize the beep sound
+function initBeepSound() {
+    beepSound = document.getElementById('beepSound');
+    // Preload the sound
+    if (beepSound) {
+        beepSound.load();
+        debugLog('Beep sound initialized');
+    }
+}
+
+function playRecognitionBeep(studentId) {
+    const now = Date.now();
+    const cacheKey = `beep_${studentId}`;
+    const lastBeepTime = recognizedFacesCache.get(cacheKey);
+    
+    // Only play beep if this face wasn't recognized in the last 5 seconds
+    if (!lastBeepTime || now - lastBeepTime > BEEP_CACHE_DURATION) {
+        if (beepSound) {
+            recognizedFacesCache.set(cacheKey, now);
+            
+            // Reset sound to start and play
+            beepSound.currentTime = 0;
+            beepSound.play().then(() => {
+                debugLog(`Beep played for student ${studentId}`);
+            }).catch(err => {
+                debugLog(`Could not play beep: ${err.message}`);
+            });
+        }
+    } else {
+        debugLog(`Skipping beep for recently recognized student ${studentId}`);
+    }
+}
         
         // Debug logging
         function debugLog(message) {
@@ -425,7 +472,9 @@ const CACHE_DURATION = 1000;
                 filteredFaceDescriptors = [];
                 return;
             }
-
+                // Clear the beep cache when section changes
+             recognizedFacesCache.clear();
+             debugLog('Cleared beep cache for new section');
             showStatus('info', 'Loading faces for selected section...');
             debugLog(`Section changed to: ${selectedSection}`);
             
@@ -472,7 +521,8 @@ const CACHE_DURATION = 1000;
             try {
                 await loadModels();
                 await loadSections();
-                
+                // Initialize beep sound
+        initBeepSound();
                 video = document.getElementById('video');
                 canvas = document.getElementById('canvas');
                 const ctx = canvas.getContext('2d');
@@ -647,12 +697,12 @@ async function recognizeFaces() {
     if (isMarking) {
         ctx.fillStyle = '#ffff00';
         ctx.font = 'bold 12px Arial';
-        ctx.fillText('Marking...', mirroredX + box.width - 100, box.y - 15);
+        // ctx.fillText('Marking...', mirroredX + box.width - 100, box.y - 15);
     } else if (cachedResult && now - cachedResult.timestamp <= CACHE_DURATION) {
         // Show "Already Marked" indicator if recently cached
         ctx.fillStyle = '#ff9900';
         ctx.font = 'bold 12px Arial';
-        ctx.fillText('Already Marked', mirroredX + box.width - 100, box.y - 15);
+        // ctx.fillText('Already Marked', mirroredX + box.width - 100, box.y - 15);
     }
     
     // Show appropriate status message
@@ -664,6 +714,7 @@ async function recognizeFaces() {
         showStatus('info', `👤 Detected: ${name} (${confidence}%)`);
     }
     
+    
     // Cache and mark attendance if not recently processed
     if (!cachedResult || now - cachedResult.timestamp > CACHE_DURATION) {
         // Cache the match
@@ -672,6 +723,9 @@ async function recognizeFaces() {
             match: bestMatch,
             distance: bestDistance
         });
+
+        // PLAY BEEP SOUND FOR NEW RECOGNITION
+        playRecognitionBeep(bestMatch.student_id);
         
         // Mark attendance in background (don't wait for it)
         markAttendance(bestMatch.student_id).catch(err => {
@@ -680,6 +734,7 @@ async function recognizeFaces() {
     } else {
         debugLog(`Skipping recently cached match for ${name}`);
     }
+
 } else {
                     // Draw unknown face indicator
                     ctx.fillStyle = '#ff0000';

@@ -51,6 +51,7 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] !== true) {
                 ← <i class="bi bi-speedometer2"></i> Back to Attendance
             </a>
             
+            
         </div>
     </nav>
 

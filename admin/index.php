@@ -151,6 +151,11 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] != true) {
                     <h2>Principal/Head Monitoring</h2>
                     <p>Monitor Attendance in Real-time. Dedicated to Authorized View</p>
                 </a>
+                <a href="absence_tracking.php" class="menu-card">
+                    <div class="icon">👁️</div>
+                    <h2>Absenteeism Remarks</h2>
+                    <p>View all absences reasons/remarks</p>
+                </a>
 
                 
             </div>
