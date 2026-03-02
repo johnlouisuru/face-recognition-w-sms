@@ -156,6 +156,11 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] != true) {
                     <h2>Absenteeism Remarks</h2>
                     <p>View all absences reasons/remarks</p>
                 </a>
+                <a href="manual_attendance.php" class="menu-card">
+                    <div class="icon">👥</div>
+                    <h2>Manual Attendance</h2>
+                    <p>Manually mark attendance for students</p>
+                </a>
 
                 
             </div>
