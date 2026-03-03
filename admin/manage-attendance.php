@@ -255,30 +255,36 @@
                     html = '<p class="status info">No attendance records found</p>';
                 } else {
                     records.forEach(record => {
-                        let time_in = "-";
-                        let time_out_date = "-";
-                        let time_out_time = "-";
-                        if(record.time_in !== null){
-                            time_in = new Date(record.time_in);
-                        }
-                        if(record.time_out !== null){
-                            time_out_date = new Date(record.time_out).toLocaleDateString();
-                            time_out_time = new Date(record.time_out).toLocaleTimeString();
-                        }
-                        
-                        html += `<tr>
-                            <td>${record.attendance_id}</td>
-                            <td>${record.student_id}</td>
-                            <td>${record.student_name} ${record.student_mi} ${record.student_last}</td>
-                            <td>${record.student_grade}</td>
-                            <td>${time_in.toLocaleDateString()} ${time_in.toLocaleTimeString()}</td>
-                            <td>${time_out_date} ${time_out_time}</td>
-                            <td>
-                                <button class="action-btn edit" onclick='editAttendance(${JSON.stringify(record)})'>✏️ Edit</button>
-                                <button class="action-btn delete" onclick="deleteAttendance(${record.attendance_id}, '${record.student_name}')">🗑️ Delete</button>
-                            </td>
-                        </tr>`;
-                    });
+    let time_in_display = "-";
+    let time_out_display = "-";
+    
+    if(record.time_in && record.time_in !== '0000-00-00 00:00:00') {
+        const time_in = new Date(record.time_in);
+        if (!isNaN(time_in.getTime())) {
+            time_in_display = time_in.toLocaleDateString() + ' ' + time_in.toLocaleTimeString();
+        }
+    }
+    
+    if(record.time_out && record.time_out !== '0000-00-00 00:00:00') {
+        const time_out = new Date(record.time_out);
+        if (!isNaN(time_out.getTime())) {
+            time_out_display = time_out.toLocaleDateString() + ' ' + time_out.toLocaleTimeString();
+        }
+    }
+    
+    html += `<tr>
+        <td>${record.attendance_id}</td>
+        <td>${record.student_id}</td>
+        <td>${record.student_name} ${record.student_mi} ${record.student_last}</td>
+        <td>${record.student_grade}</td>
+        <td>${time_in_display}</td>
+        <td>${time_out_display}</td>
+        <td>
+            <button class="action-btn edit" onclick='editAttendance(${JSON.stringify(record)})'>✏️ Edit</button>
+            <button class="action-btn delete" onclick="deleteAttendance(${record.attendance_id}, '${record.student_name}')">🗑️ Delete</button>
+        </td>
+    </tr>`;
+});
                     html += '</tbody></table>';
                 }
 
