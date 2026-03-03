@@ -37,8 +37,8 @@ if (!$result) {
 $records = [];
 while ($row = $result->fetch_assoc()) {
   // Normalize datetimes to ISO 8601 (or null)
-  $row['time_in']  = $row['time_in']  ? date('c', strtotime($row['time_in']))  : null;
-  $row['time_out'] = $row['time_out'] ? date('c', strtotime($row['time_out'])) : null;
+  $row['time_in'] = $row['time_in'] ? date('Y-m-d H:i:s', strtotime($row['time_in'])) : null;
+    $row['time_out'] = $row['time_out'] ? date('Y-m-d H:i:s', strtotime($row['time_out'])) : null;
   $row['timestamp'] = $row['timestamp'] ? date('c', strtotime($row['timestamp'])) : null;
   $records[] = $row;
 }
