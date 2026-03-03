@@ -96,8 +96,8 @@ if (!isset($_SESSION['logged_in']) || $_SESSION['logged_in'] != true) {
 <body>
     <div class="container">
         <div class="header">
-            <h1>📸 Facial Recognition with SMS Notification</h1>
-            <p>AI-Powered Student Attendance Platform</p>
+            <h1>Intelligent Attendance Monitoring System</h1>
+            <p>Tinajeros National High School</p>
         </div>
 
         <div class="content">
